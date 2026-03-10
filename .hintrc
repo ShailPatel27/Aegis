@@ -22,9 +22,21 @@
       "default",
       {
         "ignore": [
-          "-webkit-text-size-adjust"
+          "-webkit-text-size-adjust",
+          "-webkit-line-clamp",
+          "vertical-align"
         ]
       }
     ]
-  }
+  },
+  "browserslist": [
+    "defaults",
+    "not ie 11",
+    "not and_ff <= 144",
+    "not chrome <= 112",
+    "not firefox <= 145",
+    "not ios_saf <= 26",
+    "not safari <= 26.2",
+    "not samsung <= 29"
+  ]
 }
