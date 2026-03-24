@@ -1,5 +1,6 @@
 import { Camera, AlertTriangle, Users, Activity } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 
 const stats = [
   { label: "Total Detections Today", value: "1,247", icon: Activity, color: "bg-blue-500" },
@@ -26,11 +27,12 @@ const recentAlerts = [
 ];
 
 export function Dashboard() {
+  const { darkMode } = useSharedDarkMode();
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Real-time overview of your vision system</p>
+        <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Dashboard</h1>
+        <p className={`mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Real-time overview of your vision system</p>
       </div>
 
       {/* Stats Cards */}
@@ -38,11 +40,13 @@ export function Dashboard() {
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.label} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+            <div key={stat.label} className={`rounded-xl shadow-sm p-6 border ${
+              darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-                  <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                  <p className={`text-sm mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{stat.label}</p>
+                  <p className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{stat.value}</p>
                 </div>
                 <div className={`${stat.color} w-12 h-12 rounded-lg flex items-center justify-center`}>
                   <Icon className="text-white" size={24} />
@@ -56,8 +60,10 @@ export function Dashboard() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Live Feed Preview */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Live Feed Preview</h2>
+        <div className={`lg:col-span-2 rounded-xl shadow-sm p-6 border ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Live Feed Preview</h2>
           <div className="relative bg-gray-900 rounded-lg overflow-hidden aspect-video">
             <img 
               src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80" 
@@ -82,21 +88,25 @@ export function Dashboard() {
         </div>
 
         {/* Recent Alerts */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Alerts</h2>
+        <div className={`rounded-xl shadow-sm p-6 border ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Recent Alerts</h2>
           <div className="space-y-3">
             {recentAlerts.map((alert) => (
               <div 
                 key={alert.id} 
-                className="p-3 bg-gray-50 rounded-lg border-l-4"
+                className={`p-3 rounded-lg border-l-4 ${
+                  darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                }`}
                 style={{ borderLeftColor: alert.severity === 'high' ? '#ef4444' : alert.severity === 'medium' ? '#f59e0b' : '#6b7280' }}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <p className="font-medium text-gray-900 text-sm">{alert.type}</p>
-                    <p className="text-xs text-gray-600 mt-1">{alert.camera}</p>
+                    <p className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-gray-900'}`}>{alert.type}</p>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{alert.camera}</p>
                   </div>
-                  <span className="text-xs text-gray-500">{alert.time}</span>
+                  <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{alert.time}</span>
                 </div>
               </div>
             ))}
@@ -105,15 +115,22 @@ export function Dashboard() {
       </div>
 
       {/* Activity Graph */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Detection Activity (Last 24 Hours)</h2>
+      <div className={`rounded-xl shadow-sm p-6 border ${
+        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      }`}>
+        <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Detection Activity (Last 24 Hours)</h2>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={activityData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="time" stroke="#6b7280" />
-            <YAxis stroke="#6b7280" />
+            <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
+            <XAxis dataKey="time" stroke={darkMode ? '#9ca3af' : '#6b7280'} />
+            <YAxis stroke={darkMode ? '#9ca3af' : '#6b7280'} />
             <Tooltip 
-              contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+              contentStyle={{ 
+                backgroundColor: darkMode ? '#1f2937' : '#fff', 
+                border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, 
+                borderRadius: '8px',
+                color: darkMode ? '#fff' : '#000'
+              }}
             />
             <Line 
               type="monotone" 

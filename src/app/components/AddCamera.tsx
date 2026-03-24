@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, ShoppingBag, Building, GraduationCap, Star } from "lucide-react";
+import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 
 const predefinedTemplates = [
   {
@@ -69,6 +70,7 @@ type SavedConfig = {
 };
 
 export function AddCamera() {
+  const { darkMode } = useSharedDarkMode();
   const [showNameModal, setShowNameModal] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<CameraConfig | null>(null);
   const [cameraName, setCameraName] = useState("");
@@ -203,28 +205,35 @@ export function AddCamera() {
     return "bg-gray-500";
   };
 
+  // Use original sorted configs for manual scrolling
   return (
     <div className="p-8">
       <style>{`
         .hide-scrollbar::-webkit-scrollbar {
           display: none;
         }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
       `}</style>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Add Camera</h1>
-        <p className="text-gray-600 mt-1">Configure and deploy new camera with detection presets</p>
+        <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Add Camera</h1>
+        <p className={`mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Configure and deploy new camera with detection presets</p>
       </div>
 
       {/* Predefined Templates */}
       <div className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Predefined Presets</h2>
+        <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Predefined Presets</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {predefinedTemplates.map((template) => {
             const Icon = template.icon;
             return (
               <div 
                 key={template.id}
-                className="bg-white rounded-xl shadow-sm border-2 border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+                className={`rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-shadow ${
+                  darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                }`}
               >
                 <div className={`${template.color} p-6 text-white`}>
                   <div className="flex items-center justify-between mb-3">
@@ -239,26 +248,32 @@ export function AddCamera() {
                     <FeatureItem 
                       enabled={template.features.objectDetection} 
                       label="Object Detection" 
+                      darkMode={darkMode}
                     />
                     <FeatureItem 
                       enabled={template.features.weaponDetection} 
                       label="Weapon Detection" 
+                      darkMode={darkMode}
                     />
                     <FeatureItem 
                       enabled={template.features.faceRecognition} 
                       label="Face Recognition" 
+                      darkMode={darkMode}
                     />
                     <FeatureItem 
                       enabled={template.features.runningDetection} 
                       label="Running Detection" 
+                      darkMode={darkMode}
                     />
                     <FeatureItem 
                       enabled={template.features.loiteringDetection} 
                       label="Loitering Detection" 
+                      darkMode={darkMode}
                     />
                     <FeatureItem 
                       enabled={template.features.crowdDetection} 
                       label="Crowd Detection" 
+                      darkMode={darkMode}
                     />
                   </div>
                   
@@ -278,18 +293,24 @@ export function AddCamera() {
       {/* Saved Configurations */}
       {savedConfigs.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+          <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
             Previously Used Configurations
           </h2>
-          <div className="overflow-x-auto pb-4 -mx-8 px-8 hide-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="overflow-x-auto pb-4 -mx-8 px-8 hide-scrollbar">
             <div className="flex gap-6" style={{ width: 'max-content' }}>
               {sortedConfigs.map((savedConfig) => {
                 const colorClass = getConfigColor(savedConfig.config);
                 return (
                   <div 
                     key={savedConfig.id}
-                    className="bg-white rounded-xl shadow-sm border-2 border-gray-200 overflow-hidden hover:shadow-md transition-shadow relative flex-shrink-0"
-                    style={{ width: 'calc((100vw - 16rem - 8rem) / 3 - 1rem)' }}
+                    className={`rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-shadow relative flex-shrink-0 ${
+                      darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                    }`}
+                    style={{ 
+                      width: 'clamp(280px, 25vw, 350px)', // Responsive width: min 280px, max 350px
+                      minWidth: '280px',
+                      maxWidth: '350px'
+                    }}
                   >
                     <div className={`${colorClass} p-6 text-white relative`}>
                       <button
@@ -315,26 +336,32 @@ export function AddCamera() {
                         <FeatureItem 
                           enabled={savedConfig.config.objectDetection} 
                           label="Object Detection" 
+                          darkMode={darkMode}
                         />
                         <FeatureItem 
                           enabled={savedConfig.config.weaponDetection} 
                           label="Weapon Detection" 
+                          darkMode={darkMode}
                         />
                         <FeatureItem 
                           enabled={savedConfig.config.faceRecognition} 
                           label="Face Recognition" 
+                          darkMode={darkMode}
                         />
                         <FeatureItem 
                           enabled={savedConfig.config.runningDetection} 
                           label="Running Detection" 
+                          darkMode={darkMode}
                         />
                         <FeatureItem 
                           enabled={savedConfig.config.loiteringDetection} 
                           label="Loitering Detection" 
+                          darkMode={darkMode}
                         />
                         <FeatureItem 
                           enabled={savedConfig.config.crowdDetection} 
                           label="Crowd Detection" 
+                          darkMode={darkMode}
                         />
                       </div>
                       
@@ -354,10 +381,12 @@ export function AddCamera() {
       )}
 
       {/* Custom Configuration Builder */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+      <div className={`rounded-xl shadow-sm p-6 border ${
+        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      }`}>
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">Custom Configuration</h2>
-          <p className="text-sm text-gray-600 mt-1">Build your own detection setup</p>
+          <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Custom Configuration</h2>
+          <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Build your own detection setup</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -366,36 +395,42 @@ export function AddCamera() {
             description="Track and identify objects in real-time"
             enabled={customConfig.objectDetection}
             onToggle={() => toggleCustomFeature('objectDetection')}
+            darkMode={darkMode}
           />
           <ToggleCard
             label="Weapon Detection"
             description="Detect weapons and dangerous objects"
             enabled={customConfig.weaponDetection}
             onToggle={() => toggleCustomFeature('weaponDetection')}
+            darkMode={darkMode}
           />
           <ToggleCard
             label="Face Recognition"
             description="Identify individuals using facial analysis"
             enabled={customConfig.faceRecognition}
             onToggle={() => toggleCustomFeature('faceRecognition')}
+            darkMode={darkMode}
           />
           <ToggleCard
             label="Running Detection"
             description="Detect rapid movement patterns"
             enabled={customConfig.runningDetection}
             onToggle={() => toggleCustomFeature('runningDetection')}
+            darkMode={darkMode}
           />
           <ToggleCard
             label="Loitering Detection"
             description="Identify prolonged stationary presence"
             enabled={customConfig.loiteringDetection}
             onToggle={() => toggleCustomFeature('loiteringDetection')}
+            darkMode={darkMode}
           />
           <ToggleCard
             label="Crowd Detection"
             description="Monitor group formations and density"
             enabled={customConfig.crowdDetection}
             onToggle={() => toggleCustomFeature('crowdDetection')}
+            darkMode={darkMode}
           />
         </div>
 
@@ -403,7 +438,9 @@ export function AddCamera() {
           <input 
             type="text" 
             placeholder="Camera name (e.g., Lobby Camera 1)"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+            }`}
             value={cameraName}
             onChange={(e) => setCameraName(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && addCustomCamera()}
@@ -421,15 +458,19 @@ export function AddCamera() {
       {/* Name Input Modal */}
       {showNameModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">Name Your Camera</h3>
-            <p className="text-sm text-gray-600 mb-4">
+          <div className={`rounded-xl p-6 max-w-md w-full mx-4 ${
+            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'
+          }`}>
+            <h3 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Name Your Camera</h3>
+            <p className={`text-sm mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Enter a name for this camera configuration
             </p>
             <input 
               type="text" 
               placeholder="Enter camera name (e.g., Main Entrance)"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4 ${
+                darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+              }`}
               value={cameraName}
               onChange={(e) => setCameraName(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && saveCamera()}
@@ -449,7 +490,9 @@ export function AddCamera() {
                   setSelectedConfig(null);
                   setCameraName("");
                 }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
               >
                 Cancel
               </button>
@@ -461,15 +504,15 @@ export function AddCamera() {
   );
 }
 
-function FeatureItem({ enabled, label }: { enabled: boolean; label: string }) {
+function FeatureItem({ enabled, label, darkMode }: { enabled: boolean; label: string; darkMode: boolean }) {
   return (
     <div className="flex items-center gap-2 text-sm">
       {enabled ? (
-        <Check size={16} className="text-green-600" />
+        <Check size={16} className={darkMode ? "text-green-400" : "text-green-600"} />
       ) : (
-        <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
+        <div className={`w-4 h-4 rounded-full border-2 ${darkMode ? 'border-gray-600' : 'border-gray-300'}`} />
       )}
-      <span className={enabled ? "text-gray-900" : "text-gray-400"}>{label}</span>
+      <span className={enabled ? (darkMode ? "text-white" : "text-gray-900") : (darkMode ? "text-gray-500" : "text-gray-400")}>{label}</span>
     </div>
   );
 }
@@ -478,26 +521,30 @@ function ToggleCard({
   label, 
   description, 
   enabled, 
-  onToggle 
+  onToggle,
+  darkMode 
 }: { 
   label: string; 
   description: string; 
   enabled: boolean; 
   onToggle: () => void;
+  darkMode: boolean;
 }) {
   return (
     <div className={`p-4 rounded-lg border-2 transition-all ${
-      enabled ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50'
+      enabled 
+        ? (darkMode ? 'border-blue-500 bg-blue-950' : 'border-blue-500 bg-blue-50')
+        : (darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50')
     }`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <h3 className="font-medium text-gray-900 mb-1">{label}</h3>
-          <p className="text-sm text-gray-600">{description}</p>
+          <h3 className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{label}</h3>
+          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{description}</p>
         </div>
         <button
           onClick={onToggle}
           className={`ml-4 w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-            enabled ? "bg-blue-600" : "bg-gray-300"
+            enabled ? "bg-blue-600" : (darkMode ? "bg-gray-600" : "bg-gray-300")
           }`}
         >
           <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${

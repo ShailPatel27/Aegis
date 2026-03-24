@@ -8,20 +8,105 @@ import { Analytics } from "./components/Analytics";
 import { AddCamera } from "./components/AddCamera";
 import { Settings } from "./components/Settings";
 import { CameraConfig } from "./components/CameraConfig";
+import { UserTypeSelection } from "./components/UserTypeSelection";
+import { LoginSignup } from "./components/LoginSignup";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <Layout />,
+    element: <LoginSignup />,
+  },
+  {
+    path: "/select-type",
+    element: <UserTypeSelection />,
+  },
+  {
+    path: "/add-camera",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <AddCamera /> },
+    ],
+  },
+  {
+    path: "/dashboard",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
     children: [
       { index: true, element: <Dashboard /> },
-      { path: "live", element: <LiveMonitoring /> },
-      { path: "faces", element: <FaceRecognition /> },
-      { path: "alerts", element: <Alerts /> },
-      { path: "analytics", element: <Analytics /> },
-      { path: "add-camera", element: <AddCamera /> },
-      { path: "camera-config", element: <CameraConfig /> },
-      { path: "settings", element: <Settings /> },
+    ],
+  },
+  {
+    path: "/live",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <LiveMonitoring /> },
+    ],
+  },
+  {
+    path: "/faces",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <FaceRecognition /> },
+    ],
+  },
+  {
+    path: "/alerts",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Alerts /> },
+    ],
+  },
+  {
+    path: "/analytics",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Analytics /> },
+    ],
+  },
+  {
+    path: "/camera-config",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <CameraConfig /> },
+    ],
+  },
+  {
+    path: "/settings",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Settings /> },
     ],
   },
 ]);

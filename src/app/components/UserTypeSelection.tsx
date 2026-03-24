@@ -5,7 +5,7 @@ export function UserTypeSelection() {
   const navigate = useNavigate();
 
   const handleSelection = (type: "camera" | "monitor") => {
-    navigate(`/auth?type=${type}`);
+    navigate("/dashboard");
   };
 
   return (

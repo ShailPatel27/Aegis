@@ -1,5 +1,6 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Camera, Circle, Grid3x3, Monitor, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
+import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 
 const cameras = [
   { id: 1, name: "Main Entrance", location: "Front Door", img: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&q=80" },
@@ -19,6 +20,7 @@ const mockEvents = [
 type LayoutType = "single" | "main-with-grid" | "grid";
 
 export function LiveMonitoring() {
+  const { darkMode } = useSharedDarkMode();
   const [selectedCamera, setSelectedCamera] = useState(cameras[0]);
   const [objectDetection, setObjectDetection] = useState(true);
   const [faceRecognition, setFaceRecognition] = useState(true);
@@ -39,18 +41,18 @@ export function LiveMonitoring() {
 
   const renderVideoFeed = (camera: typeof cameras[0], isMain: boolean = false) => (
     <div className="relative bg-gray-900 rounded-lg overflow-hidden aspect-video">
-      <img 
-        src={camera.img} 
+      <img
+        src={camera.img}
         alt={camera.name}
         className="w-full h-full object-cover opacity-70"
       />
-      
+
       {/* Live Indicator */}
       <div className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
         <Circle className="w-1.5 h-1.5 fill-white animate-pulse" />
         LIVE
       </div>
-      
+
       {/* Camera Info */}
       <div className="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
         {camera.name}
@@ -87,56 +89,54 @@ export function LiveMonitoring() {
   );
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Live Monitoring</h1>
-          <p className="text-gray-600 mt-1">Real-time video feed with detection overlays</p>
-        </div>
-        
-        {/* Layout Selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700">Layout:</span>
-          <button
-            onClick={() => setLayout("single")}
-            className={`p-2 rounded-lg transition-colors ${
-              layout === "single" ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
-            }`}
-            title="Single Camera"
-          >
-            <Monitor size={20} />
-          </button>
-          <button
-            onClick={() => setLayout("main-with-grid")}
-            className={`p-2 rounded-lg transition-colors ${
-              layout === "main-with-grid" ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
-            }`}
-            title="Main + Grid"
-          >
-            <Maximize2 size={20} />
-          </button>
-          <button
-            onClick={() => setLayout("grid")}
-            className={`p-2 rounded-lg transition-colors ${
-              layout === "grid" ? "bg-blue-600 text-white" : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
-            }`}
-            title="Grid View"
-          >
-            <Grid3x3 size={20} />
-          </button>
-        </div>
-      </div>
+    <div>
+      <div className="p-8">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Live Monitoring</h1>
+            <p className={`mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Real-time video feed with detection overlays</p>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Main Video Area */}
-        <div className="lg:col-span-3">
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+          {/* Layout Selector */}
+          <div className="flex items-center gap-2">
+            <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Layout:</span>
+            <button
+              onClick={() => setLayout("single")}
+              className={`p-2 rounded-lg transition-colors ${layout === "single" ? "bg-blue-600 text-white" : `${darkMode ? 'bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'}`
+                }`}
+              title="Single Camera"
+            >
+              <Monitor size={20} />
+            </button>
+            <button
+              onClick={() => setLayout("main-with-grid")}
+              className={`p-2 rounded-lg transition-colors ${layout === "main-with-grid" ? "bg-blue-600 text-white" : `${darkMode ? 'bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'}`
+                }`}
+              title="Main + Grid"
+            >
+              <Maximize2 size={20} />
+            </button>
+            <button
+              onClick={() => setLayout("grid")}
+              className={`p-2 rounded-lg transition-colors ${layout === "grid" ? "bg-blue-600 text-white" : `${darkMode ? 'bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'}`
+                }`}
+              title="Grid View"
+            >
+              <Grid3x3 size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Main Video Area */}
+          <div className={`lg:col-span-3 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            } rounded-xl shadow-sm p-6 border`}>
             {/* Single Camera Layout with Navigation */}
             {layout === "single" && (
               <div className="relative">
                 <div className="relative">
                   {renderVideoFeed(cameras[mainCameraIndex], true)}
-                  
+
                   {/* Navigation Buttons */}
                   <button
                     onClick={goToPrevCamera}
@@ -151,10 +151,10 @@ export function LiveMonitoring() {
                     <ChevronRight size={24} />
                   </button>
                 </div>
-                
+
                 {/* Camera Counter */}
                 <div className="mt-4 text-center">
-                  <span className="text-sm text-gray-600">
+                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                     Camera {mainCameraIndex + 1} of {cameras.length}
                   </span>
                 </div>
@@ -165,9 +165,10 @@ export function LiveMonitoring() {
             {layout === "main-with-grid" && (
               <div>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Main Camera</label>
-                  <select 
-                    className="w-full md:w-96 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Main Camera</label>
+                  <select
+                    className={`w-full md:w-96 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                      }`}
                     value={selectedCamera.id}
                     onChange={(e) => {
                       const camera = cameras.find(c => c.id === parseInt(e.target.value));
@@ -184,9 +185,9 @@ export function LiveMonitoring() {
                     ))}
                   </select>
                 </div>
-                
+
                 {renderVideoFeed(selectedCamera, true)}
-                
+
                 {/* Thumbnail Grid */}
                 <div className="mt-4 grid grid-cols-4 gap-3">
                   {cameras.filter(c => c.id !== selectedCamera.id).map((camera) => (
@@ -196,10 +197,11 @@ export function LiveMonitoring() {
                         setSelectedCamera(camera);
                         setMainCameraIndex(cameras.indexOf(camera));
                       }}
-                      className="relative rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-500 transition-colors"
+                      className={`relative rounded-lg overflow-hidden border-2 transition-colors ${darkMode ? 'border-gray-600 hover:border-blue-400' : 'border-gray-200 hover:border-blue-500'
+                        }`}
                     >
-                      <img 
-                        src={camera.img} 
+                      <img
+                        src={camera.img}
                         alt={camera.name}
                         className="w-full aspect-video object-cover opacity-80 hover:opacity-100 transition-opacity"
                       />
@@ -224,11 +226,10 @@ export function LiveMonitoring() {
                       setMainCameraIndex(cameras.indexOf(camera));
                       setLayout("main-with-grid");
                     }}
-                    className={`rounded-lg overflow-hidden border-2 transition-colors ${
-                      selectedCamera.id === camera.id 
-                        ? "border-blue-500" 
-                        : "border-gray-200 hover:border-blue-300"
-                    }`}
+                    className={`rounded-lg overflow-hidden border-2 transition-colors ${selectedCamera.id === camera.id
+                      ? "border-blue-500"
+                      : darkMode ? "border-gray-600 hover:border-blue-400" : "border-gray-200 hover:border-blue-300"
+                      }`}
                   >
                     {renderVideoFeed(camera, false)}
                   </button>
@@ -238,102 +239,100 @@ export function LiveMonitoring() {
 
             {/* Control Toggles */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className={`flex items-center justify-between p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                }`}>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Object Detection</p>
-                  <p className="text-xs text-gray-600">Track objects</p>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Object Detection</p>
+                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Track objects</p>
                 </div>
                 <button
                   onClick={() => setObjectDetection(!objectDetection)}
-                  className={`w-12 h-6 rounded-full transition-colors ${
-                    objectDetection ? "bg-green-500" : "bg-gray-300"
-                  }`}
+                  className={`w-12 h-6 rounded-full transition-colors ${objectDetection ? "bg-blue-600" : "bg-gray-300"
+                    }`}
                 >
-                  <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
-                    objectDetection ? "translate-x-6" : "translate-x-0.5"
-                  }`} />
+                  <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${objectDetection ? "translate-x-6" : "translate-x-0.5"
+                    }`} />
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className={`flex items-center justify-between p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                }`}>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Face Recognition</p>
-                  <p className="text-xs text-gray-600">Identify faces</p>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Face Recognition</p>
+                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Identify faces</p>
                 </div>
                 <button
                   onClick={() => setFaceRecognition(!faceRecognition)}
-                  className={`w-12 h-6 rounded-full transition-colors ${
-                    faceRecognition ? "bg-green-500" : "bg-gray-300"
-                  }`}
+                  className={`w-12 h-6 rounded-full transition-colors ${faceRecognition ? "bg-blue-600" : "bg-gray-300"
+                    }`}
                 >
-                  <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
-                    faceRecognition ? "translate-x-6" : "translate-x-0.5"
-                  }`} />
+                  <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${faceRecognition ? "translate-x-6" : "translate-x-0.5"
+                    }`} />
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className={`flex items-center justify-between p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                }`}>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Weapon Detection</p>
-                  <p className="text-xs text-gray-600">Detect threats</p>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Weapon Detection</p>
+                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Detect threats</p>
                 </div>
                 <button
                   onClick={() => setWeaponDetection(!weaponDetection)}
-                  className={`w-12 h-6 rounded-full transition-colors ${
-                    weaponDetection ? "bg-green-500" : "bg-gray-300"
-                  }`}
+                  className={`w-12 h-6 rounded-full transition-colors ${weaponDetection ? "bg-blue-600" : "bg-gray-300"
+                    }`}
                 >
-                  <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
-                    weaponDetection ? "translate-x-6" : "translate-x-0.5"
-                  }`} />
+                  <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${weaponDetection ? "translate-x-6" : "translate-x-0.5"
+                    }`} />
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className={`flex items-center justify-between p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                }`}>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Screenshots</p>
-                  <p className="text-xs text-gray-600">Auto capture</p>
+                  <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Screenshots</p>
+                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Auto capture</p>
                 </div>
                 <button
                   onClick={() => setScreenshot(!screenshot)}
-                  className={`w-12 h-6 rounded-full transition-colors ${
-                    screenshot ? "bg-green-500" : "bg-gray-300"
-                  }`}
+                  className={`w-12 h-6 rounded-full transition-colors ${screenshot ? "bg-blue-600" : "bg-gray-300"
+                    }`}
                 >
-                  <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
-                    screenshot ? "translate-x-6" : "translate-x-0.5"
-                  }`} />
+                  <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${screenshot ? "translate-x-6" : "translate-x-0.5"
+                    }`} />
                 </button>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Event Feed */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Camera size={20} />
-              Real-Time Events
-            </h2>
-            <div className="space-y-3 max-h-[600px] overflow-y-auto">
-              {mockEvents.map((event) => (
-                <div key={event.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex gap-3">
-                    <img 
-                      src={event.img} 
-                      alt={event.type}
-                      className="w-16 h-16 rounded object-cover"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{event.type}</p>
-                      <p className="text-xs text-gray-600 mt-1">Confidence: {event.confidence}</p>
-                      <p className="text-xs text-gray-500 mt-1">{event.time}</p>
-                    </div>
+      {/* Event Feed */}
+      <div className="lg:col-span-1">
+        <div className={`rounded-xl shadow-sm p-6 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+          <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            <Camera size={20} />
+            Real-Time Events
+          </h2>
+          <div className="space-y-3 max-h-[600px] overflow-y-auto">
+            {mockEvents.map((event) => (
+              <div key={event.id} className={`p-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+                }`}>
+                <div className="flex gap-3">
+                  <img
+                    src={event.img}
+                    alt={event.type}
+                    className="w-16 h-16 rounded object-cover"
+                  />
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{event.type}</p>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Confidence: {event.confidence}</p>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{event.time}</p>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

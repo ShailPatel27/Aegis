@@ -1,5 +1,7 @@
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Sector, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { TrendingUp, Users, Camera, AlertTriangle } from "lucide-react";
+import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
+import { useState } from "react";
 
 const detectionOverTime = [
   { id: "det-1", date: "Feb 24", detections: 234 },
@@ -43,16 +45,20 @@ const stats = [
 ];
 
 export function Analytics() {
+  const { darkMode } = useSharedDarkMode();
+  const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
   return (
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
-          <p className="text-gray-600 mt-1">Visual insights and system performance</p>
+          <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Analytics</h1>
+          <p className={`mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Visual insights and system performance</p>
         </div>
         <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-gray-700">Date Range:</label>
-          <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
+          <label className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Date Range:</label>
+          <select className={`px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+            darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+          }`}>
             <option>Last 7 Days</option>
             <option>Last 30 Days</option>
             <option>Last 90 Days</option>
@@ -66,17 +72,21 @@ export function Analytics() {
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.label} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+            <div key={stat.label} className={`rounded-xl shadow-sm p-6 border ${
+              darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            }`}>
               <div className="flex items-center justify-between mb-3">
                 <Icon className={stat.color} size={24} />
                 <span className={`text-sm font-medium ${
-                  stat.change.startsWith('+') ? 'text-green-600' : 'text-red-600'
+                  stat.change.startsWith('+') 
+                    ? darkMode ? 'text-green-400' : 'text-green-600'
+                    : darkMode ? 'text-red-400' : 'text-red-600'
                 }`}>
                   {stat.change}
                 </span>
               </div>
-              <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-              <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+              <p className={`text-sm mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{stat.label}</p>
+              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{stat.value}</p>
             </div>
           );
         })}
@@ -85,15 +95,22 @@ export function Analytics() {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Detection Over Time */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Detections Over Time</h2>
+        <div className={`rounded-xl shadow-sm p-6 border ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <h2 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Detections Over Time</h2>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={detectionOverTime}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
+              <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
+              <XAxis dataKey="date" stroke={darkMode ? '#9ca3af' : '#6b7280'} />
+              <YAxis stroke={darkMode ? '#9ca3af' : '#6b7280'} />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                contentStyle={{ 
+                  backgroundColor: darkMode ? '#1f2937' : '#fff', 
+                  border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, 
+                  borderRadius: '8px',
+                  color: darkMode ? '#f3f4f6' : '#111827'
+                }}
               />
               <Line 
                 key="detections-line"
@@ -109,15 +126,22 @@ export function Analytics() {
         </div>
 
         {/* Object Type Distribution */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Object Type Distribution</h2>
+        <div className={`rounded-xl shadow-sm p-6 border ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <h2 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Object Type Distribution</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={objectTypeData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="type" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
+              <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
+              <XAxis dataKey="type" stroke={darkMode ? '#9ca3af' : '#6b7280'} />
+              <YAxis stroke={darkMode ? '#9ca3af' : '#6b7280'} />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                contentStyle={{ 
+                  backgroundColor: darkMode ? '#1f2937' : '#fff', 
+                  border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, 
+                  borderRadius: '8px',
+                  color: darkMode ? '#f3f4f6' : '#111827'
+                }}
               />
               <Bar key="count-bar" dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} />
             </BarChart>
@@ -125,8 +149,10 @@ export function Analytics() {
         </div>
 
         {/* Face Recognition Breakdown */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Face Recognition Breakdown</h2>
+        <div className={`rounded-xl shadow-sm p-6 border ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <h2 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Face Recognition Breakdown</h2>
           <div className="flex items-center justify-center">
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
@@ -140,12 +166,41 @@ export function Analytics() {
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
+                  activeIndex={activeIndex}
+                  activeShape={(props: any) => {
+                    const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+                    return (
+                      <Sector
+                        cx={cx}
+                        cy={cy}
+                        innerRadius={innerRadius}
+                        outerRadius={outerRadius + 10}
+                        startAngle={startAngle}
+                        endAngle={endAngle}
+                        fill={fill}
+                      />
+                    );
+                  }}
+                  onMouseEnter={(_, index) => setActiveIndex(index)}
+                  onMouseLeave={() => setActiveIndex(undefined)}
                 >
                   {faceRecognitionData.map((entry) => (
                     <Cell key={`cell-${entry.id}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: darkMode ? '#1f2937' : '#fff', 
+                    border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, 
+                    borderRadius: '8px'
+                  }}
+                  labelStyle={{ 
+                    color: darkMode ? '#f3f4f6' : '#111827'
+                  }}
+                  itemStyle={{ 
+                    color: darkMode ? '#f3f4f6' : '#111827'
+                  }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -154,24 +209,31 @@ export function Analytics() {
               <div key={item.name} className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-sm text-gray-600">{item.name}</span>
+                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{item.name}</span>
                 </div>
-                <p className="text-lg font-bold text-gray-900">{item.value}</p>
+                <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{item.value}</p>
               </div>
             ))}
           </div>
         </div>
 
         {/* Alerts Per Day */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Alerts by Severity</h2>
+        <div className={`rounded-xl shadow-sm p-6 border ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <h2 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Alerts by Severity</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={alertsPerDay}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
+              <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
+              <XAxis dataKey="date" stroke={darkMode ? '#9ca3af' : '#6b7280'} />
+              <YAxis stroke={darkMode ? '#9ca3af' : '#6b7280'} />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                contentStyle={{ 
+                  backgroundColor: darkMode ? '#1f2937' : '#fff', 
+                  border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, 
+                  borderRadius: '8px',
+                  color: darkMode ? '#f3f4f6' : '#111827'
+                }}
               />
               <Legend />
               <Bar key="high-bar" dataKey="high" stackId="a" fill="#ef4444" name="High" radius={[0, 0, 0, 0]} />
@@ -183,49 +245,59 @@ export function Analytics() {
       </div>
 
       {/* Camera Performance Table */}
-      <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Camera Performance</h2>
+      <div className={`mt-6 rounded-xl shadow-sm border overflow-hidden ${
+        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      }`}>
+        <div className={`p-6 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+          <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera Performance</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Camera</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uptime</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detections</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alerts</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Accuracy</th>
+                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Camera</th>
+                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Uptime</th>
+                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Detections</th>
+                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Alerts</th>
+                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Accuracy</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              <tr className="hover:bg-gray-50">
-                <td className="px-6 py-4 font-medium text-gray-900">Camera 1 - Main Entrance</td>
-                <td className="px-6 py-4 text-gray-600">99.8%</td>
-                <td className="px-6 py-4 text-gray-600">2,347</td>
-                <td className="px-6 py-4 text-gray-600">12</td>
-                <td className="px-6 py-4"><span className="text-green-600 font-medium">96.2%</span></td>
+            <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+              <tr className={`transition-colors ${
+                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+              }`}>
+                <td className={`px-6 py-4 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera 1 - Main Entrance</td>
+                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>99.8%</td>
+                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>2,347</td>
+                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>12</td>
+                <td className="px-6 py-4"><span className={`font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>96.2%</span></td>
               </tr>
-              <tr className="hover:bg-gray-50">
-                <td className="px-6 py-4 font-medium text-gray-900">Camera 2 - Parking Lot</td>
-                <td className="px-6 py-4 text-gray-600">98.5%</td>
-                <td className="px-6 py-4 text-gray-600">1,892</td>
-                <td className="px-6 py-4 text-gray-600">8</td>
-                <td className="px-6 py-4"><span className="text-green-600 font-medium">94.7%</span></td>
+              <tr className={`transition-colors ${
+                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+              }`}>
+                <td className={`px-6 py-4 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera 2 - Parking Lot</td>
+                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>98.5%</td>
+                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>1,892</td>
+                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>8</td>
+                <td className="px-6 py-4"><span className={`font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>94.7%</span></td>
               </tr>
-              <tr className="hover:bg-gray-50">
-                <td className="px-6 py-4 font-medium text-gray-900">Camera 3 - Hallway A</td>
-                <td className="px-6 py-4 text-gray-600">100%</td>
-                <td className="px-6 py-4 text-gray-600">3,124</td>
-                <td className="px-6 py-4 text-gray-600">15</td>
-                <td className="px-6 py-4"><span className="text-green-600 font-medium">97.1%</span></td>
+              <tr className={`transition-colors ${
+                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+              }`}>
+                <td className={`px-6 py-4 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera 3 - Hallway A</td>
+                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>100%</td>
+                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>3,124</td>
+                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>15</td>
+                <td className="px-6 py-4"><span className={`font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>97.1%</span></td>
               </tr>
-              <tr className="hover:bg-gray-50">
-                <td className="px-6 py-4 font-medium text-gray-900">Camera 4 - Side Entrance</td>
-                <td className="px-6 py-4 text-gray-600">97.2%</td>
-                <td className="px-6 py-4 text-gray-600">1,456</td>
-                <td className="px-6 py-4 text-gray-600">6</td>
-                <td className="px-6 py-4"><span className="text-green-600 font-medium">93.8%</span></td>
+              <tr className={`transition-colors ${
+                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+              }`}>
+                <td className={`px-6 py-4 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera 4 - Side Entrance</td>
+                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>97.2%</td>
+                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>1,456</td>
+                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>6</td>
+                <td className="px-6 py-4"><span className={`font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>93.8%</span></td>
               </tr>
             </tbody>
           </table>

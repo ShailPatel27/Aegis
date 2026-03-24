@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Edit2, Save, X, Check, Trash2 } from "lucide-react";
+import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 
 type CameraConfig = {
   objectDetection: boolean;
@@ -20,6 +21,7 @@ type Camera = {
 };
 
 export function CameraConfig() {
+  const { darkMode } = useSharedDarkMode();
   const [cameras, setCameras] = useState<Camera[]>([
     {
       id: 1,
@@ -103,6 +105,7 @@ export function CameraConfig() {
   const [editConfig, setEditConfig] = useState<CameraConfig | null>(null);
   const [editName, setEditName] = useState("");
   const [editLocation, setEditLocation] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState<number | null>(null);
 
   const startEditing = (camera: Camera) => {
     setEditingCamera(camera.id);
@@ -142,12 +145,19 @@ export function CameraConfig() {
   };
 
   const deleteCamera = (cameraId: number) => {
-    if (window.confirm("Are you sure you want to delete this camera?")) {
-      setCameras(cameras.filter(cam => cam.id !== cameraId));
-      if (expandedCamera === cameraId) {
-        setExpandedCamera(null);
-      }
+    setShowDeleteModal(cameraId);
+  };
+
+  const confirmDelete = (cameraId: number) => {
+    setCameras(cameras.filter(cam => cam.id !== cameraId));
+    if (expandedCamera === cameraId) {
+      setExpandedCamera(null);
     }
+    setShowDeleteModal(null);
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteModal(null);
   };
 
   const toggleStatus = (cameraId: number) => {
@@ -161,73 +171,81 @@ export function CameraConfig() {
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Camera Configuration</h1>
-        <p className="text-gray-600 mt-1">Manage and configure all deployed cameras</p>
+        <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera Configuration</h1>
+        <p className={`mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Manage and configure all deployed cameras</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
+      <div className={`rounded-xl shadow-sm border ${
+        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      }`}>
+        <div className={`p-6 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">All Cameras</h2>
-              <p className="text-sm text-gray-600 mt-1">
+              <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>All Cameras</h2>
+              <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                 {cameras.filter(c => c.status === "active").length} active, {cameras.filter(c => c.status === "inactive").length} inactive
               </p>
             </div>
           </div>
         </div>
 
-        <div className="divide-y divide-gray-200">
+        <div className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
           {cameras.map((camera) => (
-            <div key={camera.id} className="bg-white">
+            <div key={camera.id} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <button
                 onClick={() => setExpandedCamera(expandedCamera === camera.id ? null : camera.id)}
-                className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                className={`w-full px-6 py-4 flex items-center justify-between transition-colors ${
+                  darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                }`}
               >
                 <div className="flex items-center gap-4">
                   <div className={`w-3 h-3 rounded-full ${
                     camera.status === "active" ? "bg-green-500" : "bg-gray-400"
                   }`} />
                   <div className="text-left">
-                    <h3 className="font-semibold text-gray-900">{camera.name}</h3>
-                    <p className="text-sm text-gray-600">{camera.location}</p>
+                    <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{camera.name}</h3>
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{camera.location}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                     camera.status === "active" 
-                      ? "bg-green-100 text-green-800" 
-                      : "bg-gray-100 text-gray-800"
+                      ? (darkMode ? "bg-green-900 text-green-300" : "bg-green-100 text-green-800")
+                      : (darkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-800")
                   }`}>
                     {camera.status}
                   </span>
                   {expandedCamera === camera.id ? (
-                    <ChevronUp size={20} className="text-gray-400" />
+                    <ChevronUp size={20} className={darkMode ? "text-gray-400" : "text-gray-400"} />
                   ) : (
-                    <ChevronDown size={20} className="text-gray-400" />
+                    <ChevronDown size={20} className={darkMode ? "text-gray-400" : "text-gray-400"} />
                   )}
                 </div>
               </button>
               
               {expandedCamera === camera.id && (
-                <div className="px-6 py-6 bg-gray-50 border-t border-gray-200">
+                <div className={`px-6 py-6 border-t ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                   {editingCamera === camera.id ? (
                     <div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Camera Name</label>
+                          <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Camera Name</label>
                           <input 
                             type="text" 
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                              darkMode ? 'bg-gray-600 border-gray-500 text-white' : 'bg-white border-gray-300'
+                            }`}
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                          <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Location</label>
                           <input 
                             type="text" 
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                              darkMode ? 'bg-gray-600 border-gray-500 text-white' : 'bg-white border-gray-300'
+                            }`}
                             value={editLocation}
                             onChange={(e) => setEditLocation(e.target.value)}
                           />
@@ -235,43 +253,49 @@ export function CameraConfig() {
                       </div>
                       
                       <div className="mb-6">
-                        <h4 className="font-medium text-gray-900 mb-3">Detection Features</h4>
+                        <h4 className={`font-medium mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Detection Features</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <ToggleCard
                             label="Object Detection"
                             description="Track objects"
                             enabled={editConfig?.objectDetection || false}
                             onToggle={() => toggleEditFeature('objectDetection')}
+                            darkMode={darkMode}
                           />
                           <ToggleCard
                             label="Weapon Detection"
                             description="Detect threats"
                             enabled={editConfig?.weaponDetection || false}
                             onToggle={() => toggleEditFeature('weaponDetection')}
+                            darkMode={darkMode}
                           />
                           <ToggleCard
                             label="Face Recognition"
                             description="Identify faces"
                             enabled={editConfig?.faceRecognition || false}
                             onToggle={() => toggleEditFeature('faceRecognition')}
+                            darkMode={darkMode}
                           />
                           <ToggleCard
                             label="Running Detection"
                             description="Detect movement"
                             enabled={editConfig?.runningDetection || false}
                             onToggle={() => toggleEditFeature('runningDetection')}
+                            darkMode={darkMode}
                           />
                           <ToggleCard
                             label="Loitering Detection"
                             description="Detect loitering"
                             enabled={editConfig?.loiteringDetection || false}
                             onToggle={() => toggleEditFeature('loiteringDetection')}
+                            darkMode={darkMode}
                           />
                           <ToggleCard
                             label="Crowd Detection"
                             description="Monitor crowds"
                             enabled={editConfig?.crowdDetection || false}
                             onToggle={() => toggleEditFeature('crowdDetection')}
+                            darkMode={darkMode}
                           />
                         </div>
                       </div>
@@ -296,27 +320,27 @@ export function CameraConfig() {
                   ) : (
                     <div>
                       <div className="mb-6">
-                        <h4 className="font-medium text-gray-900 mb-3">Camera Information</h4>
+                        <h4 className={`font-medium mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera Information</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
-                            <span className="text-gray-600">Name:</span>
-                            <span className="ml-2 font-medium text-gray-900">{camera.name}</span>
+                            <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Name:</span>
+                            <span className={`ml-2 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{camera.name}</span>
                           </div>
                           <div>
-                            <span className="text-gray-600">Location:</span>
-                            <span className="ml-2 font-medium text-gray-900">{camera.location}</span>
+                            <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Location:</span>
+                            <span className={`ml-2 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{camera.location}</span>
                           </div>
                           <div>
-                            <span className="text-gray-600">Status:</span>
+                            <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Status:</span>
                             <span className={`ml-2 font-medium ${
-                              camera.status === "active" ? "text-green-600" : "text-gray-600"
+                              camera.status === "active" ? (darkMode ? "text-green-400" : "text-green-600") : (darkMode ? "text-gray-400" : "text-gray-600")
                             }`}>
                               {camera.status.charAt(0).toUpperCase() + camera.status.slice(1)}
                             </span>
                           </div>
                           <div>
-                            <span className="text-gray-600">Added:</span>
-                            <span className="ml-2 font-medium text-gray-900">
+                            <span className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Added:</span>
+                            <span className={`ml-2 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                               {camera.createdAt.toLocaleDateString()}
                             </span>
                           </div>
@@ -324,31 +348,37 @@ export function CameraConfig() {
                       </div>
 
                       <div className="mb-6">
-                        <h4 className="font-medium text-gray-900 mb-3">Active Features</h4>
+                        <h4 className={`font-medium mb-3 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Active Features</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <FeatureItem 
                             enabled={camera.config.objectDetection} 
                             label="Object Detection" 
+                            darkMode={darkMode}
                           />
                           <FeatureItem 
                             enabled={camera.config.weaponDetection} 
                             label="Weapon Detection" 
+                            darkMode={darkMode}
                           />
                           <FeatureItem 
                             enabled={camera.config.faceRecognition} 
                             label="Face Recognition" 
+                            darkMode={darkMode}
                           />
                           <FeatureItem 
                             enabled={camera.config.runningDetection} 
                             label="Running Detection" 
+                            darkMode={darkMode}
                           />
                           <FeatureItem 
                             enabled={camera.config.loiteringDetection} 
                             label="Loitering Detection" 
+                            darkMode={darkMode}
                           />
                           <FeatureItem 
                             enabled={camera.config.crowdDetection} 
                             label="Crowd Detection" 
+                            darkMode={darkMode}
                           />
                         </div>
                       </div>
@@ -387,19 +417,71 @@ export function CameraConfig() {
           ))}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className={`rounded-xl p-6 max-w-md w-full mx-4 ${
+            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'
+          }`}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                darkMode ? 'bg-red-900' : 'bg-red-100'
+              }`}>
+                <Trash2 size={24} className={darkMode ? 'text-red-400' : 'text-red-600'} />
+              </div>
+              <div>
+                <h3 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Delete Camera
+                </h3>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  This action cannot be undone
+                </p>
+              </div>
+            </div>
+            
+            <div className={`mb-6 p-4 rounded-lg ${
+              darkMode ? 'bg-gray-700' : 'bg-gray-50'
+            }`}>
+              <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Are you sure you want to delete this camera? All configuration and historical data will be permanently removed.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => confirmDelete(showDeleteModal)}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+              >
+                Delete Camera
+              </button>
+              <button 
+                onClick={cancelDelete}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  darkMode 
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function FeatureItem({ enabled, label }: { enabled: boolean; label: string }) {
+function FeatureItem({ enabled, label, darkMode }: { enabled: boolean; label: string; darkMode: boolean }) {
   return (
     <div className="flex items-center gap-2 text-sm">
       {enabled ? (
-        <Check size={16} className="text-green-600" />
+        <Check size={16} className={darkMode ? "text-green-400" : "text-green-600"} />
       ) : (
-        <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
+        <div className={`w-4 h-4 rounded-full border-2 ${darkMode ? 'border-gray-600' : 'border-gray-300'}`} />
       )}
-      <span className={enabled ? "text-gray-900" : "text-gray-400"}>{label}</span>
+      <span className={enabled ? (darkMode ? "text-white" : "text-gray-900") : (darkMode ? "text-gray-500" : "text-gray-400")}>{label}</span>
     </div>
   );
 }
@@ -408,26 +490,30 @@ function ToggleCard({
   label, 
   description, 
   enabled, 
-  onToggle 
+  onToggle,
+  darkMode 
 }: { 
   label: string; 
   description: string; 
   enabled: boolean; 
   onToggle: () => void;
+  darkMode: boolean;
 }) {
   return (
     <div className={`p-4 rounded-lg border-2 transition-all ${
-      enabled ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50'
+      enabled 
+        ? (darkMode ? 'border-blue-500 bg-blue-950' : 'border-blue-500 bg-blue-50')
+        : (darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50')
     }`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <h3 className="font-medium text-gray-900 mb-1">{label}</h3>
-          <p className="text-sm text-gray-600">{description}</p>
+          <h3 className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{label}</h3>
+          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{description}</p>
         </div>
         <button
           onClick={onToggle}
           className={`ml-4 w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-            enabled ? "bg-blue-600" : "bg-gray-300"
+            enabled ? "bg-blue-600" : (darkMode ? "bg-gray-600" : "bg-gray-300")
           }`}
         >
           <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { User, Plus, Edit, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 
 const initialUsers = [
   { id: 1, name: "John Doe", role: "Employee", status: "whitelist", lastSeen: "2 min ago", image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80" },
@@ -16,6 +17,7 @@ const accessLog = [
 ];
 
 export function FaceRecognition() {
+  const { darkMode } = useSharedDarkMode();
   const [users, setUsers] = useState(initialUsers);
   const [selectedUser, setSelectedUser] = useState<typeof initialUsers[0] | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -32,8 +34,8 @@ export function FaceRecognition() {
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Face Recognition</h1>
-          <p className="text-gray-600 mt-1">Manage recognized individuals and access control</p>
+          <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Face Recognition</h1>
+          <p className={`mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Manage recognized individuals and access control</p>
         </div>
         <button 
           onClick={() => setShowAddModal(true)}
@@ -46,23 +48,29 @@ export function FaceRecognition() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Users Table */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className={`lg:col-span-2 rounded-xl shadow-sm border overflow-hidden ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className={`border-b ${
+                darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+              }`}>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Seen</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>User</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Role</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Status</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Last Seen</th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
                 {users.map((user) => (
                   <tr 
                     key={user.id} 
-                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    className={`cursor-pointer transition-colors ${
+                      darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                    }`}
                     onClick={() => setSelectedUser(user)}
                   >
                     <td className="px-6 py-4">
@@ -72,21 +80,21 @@ export function FaceRecognition() {
                           alt={user.name}
                           className="w-10 h-10 rounded-full object-cover"
                         />
-                        <span className="font-medium text-gray-900">{user.name}</span>
+                        <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{user.name}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{user.role}</td>
+                    <td className={`px-6 py-4 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{user.role}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         user.status === 'whitelist' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
+                          ? darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800'
+                          : darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800'
                       }`}>
                         {user.status === 'whitelist' ? <CheckCircle size={12} /> : <XCircle size={12} />}
                         {user.status === 'whitelist' ? 'Whitelist' : 'Blacklist'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{user.lastSeen}</td>
+                    <td className={`px-6 py-4 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{user.lastSeen}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <button 
@@ -94,7 +102,9 @@ export function FaceRecognition() {
                             e.stopPropagation();
                             setSelectedUser(user);
                           }}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          className={`p-1 rounded transition-colors ${
+                            darkMode ? 'text-blue-400 hover:bg-blue-900' : 'text-blue-600 hover:bg-blue-50'
+                          }`}
                         >
                           <Edit size={16} />
                         </button>
@@ -103,7 +113,9 @@ export function FaceRecognition() {
                             e.stopPropagation();
                             setUsers(users.filter(u => u.id !== user.id));
                           }}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          className={`p-1 rounded transition-colors ${
+                            darkMode ? 'text-red-400 hover:bg-red-900' : 'text-red-600 hover:bg-red-50'
+                          }`}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -117,29 +129,33 @@ export function FaceRecognition() {
         </div>
 
         {/* User Details Panel */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+        <div className={`rounded-xl shadow-sm p-6 border ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
           {selectedUser ? (
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">User Details</h2>
+              <h2 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>User Details</h2>
               <div className="text-center mb-6">
                 <img 
                   src={selectedUser.image} 
                   alt={selectedUser.name}
-                  className="w-32 h-32 rounded-full object-cover mx-auto mb-4 border-4 border-gray-200"
+                  className={`w-32 h-32 rounded-full object-cover mx-auto mb-4 border-4 ${
+                    darkMode ? 'border-gray-600' : 'border-gray-200'
+                  }`}
                 />
-                <h3 className="text-xl font-bold text-gray-900">{selectedUser.name}</h3>
-                <p className="text-sm text-gray-600 mt-1">{selectedUser.role}</p>
+                <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{selectedUser.name}</h3>
+                <p className={`text-sm mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{selectedUser.role}</p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Status</label>
                   <button
                     onClick={() => toggleStatus(selectedUser.id)}
                     className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
                       selectedUser.status === 'whitelist'
-                        ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                        : 'bg-red-100 text-red-800 hover:bg-red-200'
+                        ? darkMode ? 'bg-green-900 text-green-300 hover:bg-green-800' : 'bg-green-100 text-green-800 hover:bg-green-200'
+                        : darkMode ? 'bg-red-900 text-red-300 hover:bg-red-800' : 'bg-red-100 text-red-800 hover:bg-red-200'
                     }`}
                   >
                     {selectedUser.status === 'whitelist' ? 'Whitelisted' : 'Blacklisted'}
@@ -147,43 +163,49 @@ export function FaceRecognition() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Upload New Image</label>
-                  <button className="w-full px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors">
+                  <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Upload New Image</label>
+                  <button className={`w-full px-4 py-2 border-2 border-dashed rounded-lg transition-colors ${
+                    darkMode ? 'border-gray-600 text-gray-400 hover:border-blue-500 hover:text-blue-400' : 'border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-600'
+                  }`}>
                     Choose File
                   </button>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Seen</label>
-                  <p className="text-sm text-gray-600">{selectedUser.lastSeen}</p>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Last Seen</label>
+                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{selectedUser.lastSeen}</p>
                 </div>
               </div>
             </div>
           ) : (
             <div className="text-center py-12">
-              <User size={48} className="mx-auto text-gray-400 mb-3" />
-              <p className="text-gray-600">Select a user to view details</p>
+              <User size={48} className={`mx-auto mb-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+              <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>Select a user to view details</p>
             </div>
           )}
         </div>
       </div>
 
       {/* Access Log */}
-      <div className="mt-6 bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Access Log</h2>
+      <div className={`mt-6 rounded-xl shadow-sm p-6 border ${
+        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      }`}>
+        <h2 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Recent Access Log</h2>
         <div className="space-y-3">
           {accessLog.map((log) => (
-            <div key={log.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div key={log.id} className={`flex items-center justify-between p-4 rounded-lg ${
+              darkMode ? 'bg-gray-700' : 'bg-gray-50'
+            }`}>
               <div className="flex items-center gap-4">
                 <div className={`w-2 h-2 rounded-full ${log.action === 'Entry' ? 'bg-green-500' : 'bg-orange-500'}`} />
                 <div>
-                  <p className="font-medium text-gray-900">{log.name}</p>
-                  <p className="text-sm text-gray-600">{log.location}</p>
+                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{log.name}</p>
+                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{log.location}</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{log.action}</p>
-                <p className="text-xs text-gray-500">{log.time}</p>
+                <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{log.action}</p>
+                <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{log.time}</p>
               </div>
             </div>
           ))}

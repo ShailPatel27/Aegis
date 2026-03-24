@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AlertTriangle, CheckCircle, XCircle, Filter } from "lucide-react";
+import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 
 const initialAlerts = [
   { 
@@ -65,6 +66,7 @@ const initialAlerts = [
 ];
 
 export function Alerts() {
+  const { darkMode } = useSharedDarkMode();
   const [alerts, setAlerts] = useState(initialAlerts);
   const [filterSeverity, setFilterSeverity] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -89,40 +91,44 @@ export function Alerts() {
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'high': return 'border-red-500 bg-red-50';
-      case 'medium': return 'border-orange-500 bg-orange-50';
-      case 'low': return 'border-yellow-500 bg-yellow-50';
-      default: return 'border-gray-500 bg-gray-50';
+      case 'high': return darkMode ? 'border-red-700 bg-red-950/40' : 'border-red-500 bg-red-50';
+      case 'medium': return darkMode ? 'border-orange-700 bg-orange-950/40' : 'border-orange-500 bg-orange-50';
+      case 'low': return darkMode ? 'border-yellow-700 bg-yellow-950/40' : 'border-yellow-500 bg-yellow-50';
+      default: return darkMode ? 'border-gray-600 bg-gray-800/50' : 'border-gray-500 bg-gray-50';
     }
   };
 
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-orange-100 text-orange-800';
-      case 'low': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'high': return darkMode ? 'border-red-700 text-red-400 bg-gray-700/50' : 'bg-red-100 text-red-800';
+      case 'medium': return darkMode ? 'border-orange-700 text-orange-400 bg-gray-700/50' : 'bg-orange-100 text-orange-800';
+      case 'low': return darkMode ? 'border-yellow-700 text-yellow-400 bg-gray-700/50' : 'bg-yellow-100 text-yellow-800';
+      default: return darkMode ? 'border-gray-600 text-gray-400 bg-gray-700/50' : 'bg-gray-100 text-gray-800';
     }
   };
 
   return (
     <div className="p-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Alerts</h1>
-        <p className="text-gray-600 mt-1">Monitor and manage system alerts</p>
+        <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Alerts</h1>
+        <p className={`mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Monitor and manage system alerts</p>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-6">
+      <div className={`rounded-xl shadow-sm p-6 border mb-6 ${
+        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      }`}>
         <div className="flex items-center gap-2 mb-4">
-          <Filter size={20} className="text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+          <Filter size={20} className={darkMode ? 'text-gray-400' : 'text-gray-600'} />
+          <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Filters</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Severity</label>
+            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Severity</label>
             <select 
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+              }`}
               value={filterSeverity}
               onChange={(e) => setFilterSeverity(e.target.value)}
             >
@@ -133,9 +139,11 @@ export function Alerts() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Status</label>
             <select 
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+              }`}
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
             >
@@ -146,16 +154,23 @@ export function Alerts() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Date</label>
             <input 
               type="date" 
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                darkMode ? 'bg-gray-700 border-gray-600 text-white [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert' : 'bg-white border-gray-300'
+              }`}
               defaultValue="2024-03-02"
+              style={darkMode ? {
+                colorScheme: 'dark'
+              } : undefined}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Camera</label>
-            <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
+            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Camera</label>
+            <select className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+            }`}>
               <option>All Cameras</option>
               <option>Camera 1</option>
               <option>Camera 2</option>
@@ -170,7 +185,7 @@ export function Alerts() {
         {filteredAlerts.map((alert) => (
           <div 
             key={alert.id} 
-            className={`bg-white rounded-xl shadow-sm border-l-4 overflow-hidden ${getSeverityColor(alert.severity)}`}
+            className={`rounded-xl shadow-sm border-l-4 overflow-hidden ${getSeverityColor(alert.severity)}`}
           >
             <div className="p-6">
               <div className="flex items-start gap-4">
@@ -182,11 +197,11 @@ export function Alerts() {
                 <div className="flex-1">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h3 className="font-semibold text-gray-900 text-lg flex items-center gap-2">
-                        <AlertTriangle size={20} className="text-red-600" />
+                      <h3 className={`font-semibold text-lg flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        <AlertTriangle size={20} className={darkMode ? 'text-red-400' : 'text-red-600'} />
                         {alert.type}
                       </h3>
-                      <p className="text-sm text-gray-600 mt-1">{alert.camera}</p>
+                      <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{alert.camera}</p>
                     </div>
                     <span className={`px-2.5 py-1 rounded-full text-xs font-medium uppercase ${getSeverityBadge(alert.severity)}`}>
                       {alert.severity}
@@ -195,12 +210,12 @@ export function Alerts() {
                   
                   <div className="grid grid-cols-2 gap-3 mt-3">
                     <div>
-                      <p className="text-xs text-gray-600">Timestamp</p>
-                      <p className="text-sm font-medium text-gray-900">{alert.timestamp}</p>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Timestamp</p>
+                      <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{alert.timestamp}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-600">Confidence</p>
-                      <p className="text-sm font-medium text-gray-900">{alert.confidence}</p>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Confidence</p>
+                      <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{alert.confidence}</p>
                     </div>
                   </div>
 
@@ -209,14 +224,22 @@ export function Alerts() {
                       <>
                         <button 
                           onClick={() => resolveAlert(alert.id)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors text-sm ${
+                            darkMode 
+                              ? 'bg-green-700 text-white hover:bg-green-600' 
+                              : 'bg-green-600 text-white hover:bg-green-700'
+                          }`}
                         >
                           <CheckCircle size={16} />
                           Resolve
                         </button>
                         <button 
                           onClick={() => dismissAlert(alert.id)}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors text-sm ${
+                            darkMode 
+                              ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                              : 'bg-gray-600 text-white hover:bg-gray-700'
+                          }`}
                         >
                           <XCircle size={16} />
                           Dismiss
@@ -225,8 +248,8 @@ export function Alerts() {
                     ) : (
                       <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium ${
                         alert.status === 'resolved' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
+                          ? darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800'
+                          : darkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-800'
                       }`}>
                         {alert.status === 'resolved' ? <CheckCircle size={16} /> : <XCircle size={16} />}
                         {alert.status.charAt(0).toUpperCase() + alert.status.slice(1)}

@@ -1,122 +1,123 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* Base theme variables */
   --font-size: 16px;
-  --background: #ffffff;
-  --foreground: oklch(0.145 0 0);
-  --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #030213;
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0.0058 264.53);
-  --secondary-foreground: #030213;
-  --muted: #ececf0;
-  --muted-foreground: #717182;
-  --accent: #e9ebef;
-  --accent-foreground: #030213;
-  --destructive: #d4183d;
-  --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
-  --input: transparent;
-  --input-background: #f3f3f5;
-  --switch-background: #cbced4;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #030213;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  
+  /* AEGIS Light Mode Colors */
+  --aegis-bg-primary: #ffffff;
+  --aegis-bg-secondary: #f8fafc;
+  --aegis-bg-tertiary: #f1f5f9;
+  
+  --aegis-surface: #ffffff;
+  --aegis-surface-elevated: #ffffff;
+  --aegis-surface-overlay: rgba(255, 255, 255, 0.95);
+  
+  --aegis-text-primary: #0f172a;
+  --aegis-text-secondary: #475569;
+  --aegis-text-tertiary: #64748b;
+  --aegis-text-inverse: #ffffff;
+  
+  --aegis-border: #e2e8f0;
+  --aegis-border-light: #f1f5f9;
+  
+  --aegis-primary: #3b82f6;
+  --aegis-primary-hover: #2563eb;
+  --aegis-primary-light: #dbeafe;
+  
+  --aegis-secondary: #64748b;
+  --aegis-secondary-hover: #475569;
+  
+  --aegis-accent: #10b981;
+  --aegis-accent-hover: #059669;
+  
+  --aegis-danger: #ef4444;
+  --aegis-danger-hover: #dc2626;
+  
+  --aegis-warning: #f59e0b;
+  --aegis-warning-hover: #d97706;
+  
+  /* Sidebar specific */
+  --aegis-sidebar-bg: #1e293b;
+  --aegis-sidebar-text: #f8fafc;
+  --aegis-sidebar-border: #334155;
+  --aegis-sidebar-hover: #334155;
+  --aegis-sidebar-active: #3b82f6;
+  
+  /* Gradient backgrounds */
+  --aegis-gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --aegis-gradient-dark: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #1e293b 100%);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  /* AEGIS Dark Mode Colors */
+  --aegis-bg-primary: #0f172a;
+  --aegis-bg-secondary: #1e293b;
+  --aegis-bg-tertiary: #334155;
+  
+  --aegis-surface: #1e293b;
+  --aegis-surface-elevated: #334155;
+  --aegis-surface-overlay: rgba(30, 41, 59, 0.95);
+  
+  --aegis-text-primary: #f8fafc;
+  --aegis-text-secondary: #cbd5e1;
+  --aegis-text-tertiary: #94a3b8;
+  --aegis-text-inverse: #0f172a;
+  
+  --aegis-border: #334155;
+  --aegis-border-light: #475569;
+  
+  --aegis-primary: #3b82f6;
+  --aegis-primary-hover: #60a5fa;
+  --aegis-primary-light: #1e3a8a;
+  
+  --aegis-secondary: #64748b;
+  --aegis-secondary-hover: #94a3b8;
+  
+  --aegis-accent: #10b981;
+  --aegis-accent-hover: #34d399;
+  
+  --aegis-danger: #ef4444;
+  --aegis-danger-hover: #f87171;
+  
+  --aegis-warning: #f59e0b;
+  --aegis-warning-hover: #fbbf24;
+  
+  /* Sidebar specific (darker in dark mode) */
+  --aegis-sidebar-bg: #0f172a;
+  --aegis-sidebar-text: #f8fafc;
+  --aegis-sidebar-border: #1e293b;
+  --aegis-sidebar-hover: #1e293b;
+  --aegis-sidebar-active: #3b82f6;
+  
+  /* Gradient backgrounds */
+  --aegis-gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --aegis-gradient-dark: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-input-background: var(--input-background);
-  --color-switch-background: var(--switch-background);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
+  /* Map to Tailwind color system */
+  --color-background: var(--aegis-bg-primary);
+  --color-foreground: var(--aegis-text-primary);
+  --color-card: var(--aegis-surface);
+  --color-card-foreground: var(--aegis-text-primary);
+  --color-primary: var(--aegis-primary);
+  --color-primary-foreground: var(--aegis-text-inverse);
+  --color-secondary: var(--aegis-secondary);
+  --color-muted: var(--aegis-bg-tertiary);
+  --color-muted-foreground: var(--aegis-text-tertiary);
+  --color-accent: var(--aegis-accent);
+  --color-accent-foreground: var(--aegis-text-inverse);
+  --color-destructive: var(--aegis-danger);
+  --color-border: var(--aegis-border);
+  --color-ring: var(--aegis-primary);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
 }
 
 @layer base {
@@ -127,11 +128,6 @@
   body {
     @apply bg-background text-foreground;
   }
-
-  /**
-  * Default typography styles for HTML elements (h1-h4, p, label, button, input).
-  * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
-  */
 
   html {
     font-size: var(--font-size);
@@ -180,6 +176,44 @@
   }
 }
 
+/* Smooth transitions for theme switching */
 * {
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Custom utility classes for AEGIS colors */
+.bg-aegis-surface {
+  background-color: var(--aegis-surface);
+}
+
+.bg-aegis-surface-elevated {
+  background-color: var(--aegis-surface-elevated);
+}
+
+.bg-aegis-sidebar {
+  background-color: var(--aegis-sidebar-bg);
+}
+
+.text-aegis-primary {
+  color: var(--aegis-text-primary);
+}
+
+.text-aegis-secondary {
+  color: var(--aegis-text-secondary);
+}
+
+.text-aegis-tertiary {
+  color: var(--aegis-text-tertiary);
+}
+
+.border-aegis-border {
+  border-color: var(--aegis-border);
+}
+
+.border-aegis-sidebar {
+  border-color: var(--aegis-sidebar-border);
+}
+
+.hover\:bg-aegis-sidebar-hover:hover {
+  background-color: var(--aegis-sidebar-hover);
 }
