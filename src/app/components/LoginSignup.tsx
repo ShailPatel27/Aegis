@@ -1,12 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useUser } from "../context/UserContext";
-import { Camera, Monitor, AlertCircle } from "lucide-react";
+import { Camera, Monitor, AlertCircle, Mail, Phone } from "lucide-react";
 
 export function LoginSignup() {
   const navigate = useNavigate();
   const { login, register, isLoading, error } = useUser();
   const [isSignup, setIsSignup] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [useAlternateEmail, setUseAlternateEmail] = useState(false);
+  const [showForgotPasswordUI, setShowForgotPasswordUI] = useState(false);
+  const [forgotPasswordPhone, setForgotPasswordPhone] = useState("");
+  const [usePhoneForReset, setUsePhoneForReset] = useState(false);
+  const [alternateEmail, setAlternateEmail] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -35,7 +42,7 @@ export function LoginSignup() {
           name: formData.name || "User",
           email: formData.email,
           password: formData.password,
-          user_type: "monitor" // Default user type for direct signup
+          user_type: "monitor"
         });
         navigate("/select-type");
       } else {
@@ -44,6 +51,45 @@ export function LoginSignup() {
       }
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "Authentication failed");
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const resetEmail = usePhoneForReset ? forgotPasswordPhone : forgotPasswordEmail;
+    const useAltEmail = alternateEmail && !usePhoneForReset;
+    
+    if (!resetEmail) {
+      setFormError("Please enter your email address or phone number");
+      return;
+    }
+
+    try {
+      const endpoint = usePhoneForReset ? "/auth/forgot-password-alternate" : "/auth/forgot-password";
+      const response = await fetch(`http://localhost:8000${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: resetEmail,
+          use_alternate: useAltEmail
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(data.message);
+        setShowForgotPasswordUI(false);
+        setForgotPasswordEmail("");
+        setForgotPasswordPhone("");
+        setAlternateEmail("");
+        setUsePhoneForReset(false);
+      } else {
+        setFormError(data.detail || "Failed to send reset link");
+      }
+    } catch (error) {
+      setFormError("Network error. Please try again.");
     }
   };
 
@@ -61,7 +107,7 @@ export function LoginSignup() {
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">AEGIS</h1>
             <p className="text-gray-300">
-              {isSignup ? "Create" : "Sign in to"} your account
+              {showForgotPasswordUI ? "Reset Your Password" : (isSignup ? "Create" : "Sign in to") + " your account"}
             </p>
           </div>
 
@@ -76,58 +122,152 @@ export function LoginSignup() {
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {isSignup && (
+          {/* Forgot Password UI */}
+          {showForgotPasswordUI && (
+            <div className="space-y-4">
+              <p className="text-lg font-semibold text-white mb-4">Reset Your Password</p>
+              
+              {/* Email/Phone Toggle */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setUsePhoneForReset(false)}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    !usePhoneForReset 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-white/10 border border-white/20 text-gray-300'
+                  }`}
+                >
+                  <Mail size={16} className="mr-2" />
+                  Email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUsePhoneForReset(true)}
+                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    usePhoneForReset 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-white/10 border border-white/20 text-gray-300'
+                  }`}
+                >
+                  <Phone size={16} className="mr-2" />
+                  Phone Number
+                </button>
+              </div>
+              
+              {/* Phone Input Field */}
+              {usePhoneForReset && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-200 mb-2">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={forgotPasswordPhone}
+                    onChange={(e) => setForgotPasswordPhone(e.target.value)}
+                    placeholder="Enter your phone number"
+                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                </div>
+              )}
+              
+              {/* Email Fields */}
+              {!usePhoneForReset && (
+                <div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-200 mb-2">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={forgotPasswordEmail}
+                      onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                      placeholder="Enter your email address"
+                      className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setUseAlternateEmail(!useAlternateEmail)}
+                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors mt-2"
+                    >
+                      {useAlternateEmail ? "Use Primary Email" : "Use Alternate Email"}
+                    </button>
+                  </div>
+                  
+                  {/* Alternate Email Field */}
+                  {useAlternateEmail && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-200 mb-2">
+                        Alternate Email Address
+                      </label>
+                      <input
+                        type="email"
+                        value={alternateEmail}
+                        onChange={(e) => setAlternateEmail(e.target.value)}
+                        placeholder="Enter alternate email address"
+                        className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+                >
+                  Send Reset Link
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPasswordUI(false)}
+                  className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-gray-300 hover:bg-white/20 transition-colors"
+                >
+                  Back
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Regular Login/Signup Form - Only show when NOT in forgot password mode */}
+          {!showForgotPasswordUI && (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {isSignup && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-200 mb-2">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter your name"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-200 mb-2">
-                  Full Name
+                  Email Address
                 </label>
                 <input
-                  type="text"
+                  type="email"
                   required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Enter your name"
+                  placeholder="Enter your email"
                 />
               </div>
-            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-200 mb-2">
-                Email Address
-              </label>
-              <input
-                type="email"
-                required
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your email"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-200 mb-2">
-                Password
-              </label>
-              <input
-                type="password"
-                required
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your password"
-                maxLength={72}
-              />
-              <p className="text-xs text-gray-400 mt-1">Max 72 characters</p>
-            </div>
-
-            {isSignup && (
               <div>
                 <label className="block text-sm font-medium text-gray-200 mb-2">
-                  Confirm Password
+                  Password
                 </label>
                 <input
                   type="password"
@@ -141,41 +281,60 @@ export function LoginSignup() {
                   maxLength={72}
                 />
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`w-full py-3 rounded-lg font-medium transition-colors ${
-                isLoading
-                  ? "bg-gray-600 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
-            >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  Processing...
-                </span>
-              ) : (
-                isSignup ? "Sign Up" : "Sign In"
-              )}
-            </button>
-          </form>
+              {/* Forgot Password Link */}
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPasswordUI(true);
+                    setForgotPasswordEmail(formData.email);
+                  }}
+                  className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={`w-full py-3 rounded-lg font-medium transition-colors ${
+                  isLoading
+                    ? "bg-gray-600 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                }`}
+              >
+                {isLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Processing...
+                  </span>
+                ) : (
+                  isSignup ? "Sign Up" : "Sign In"
+                )}
+              </button>
+            </form>
+          )}
 
           {/* Toggle Sign In/Sign Up */}
-          <div className="mt-6 text-center">
-            <p className="text-gray-300">
-              {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
-              <button
-                onClick={() => setIsSignup(!isSignup)}
-                className="text-blue-400 hover:text-blue-300 font-medium"
-                disabled={isLoading}
-              >
-                {isSignup ? "Sign In" : "Sign Up"}
-              </button>
-            </p>
-          </div>
+          {!showForgotPasswordUI && (
+            <div className="mt-6 text-center">
+              <p className="text-gray-300">
+                {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
+                <button
+                  onClick={() => {
+                    setIsSignup(!isSignup);
+                    setShowForgotPasswordUI(false);
+                  }}
+                  className="text-blue-400 hover:text-blue-300 font-medium"
+                  disabled={isLoading}
+                >
+                  {isSignup ? "Sign In" : "Sign Up"}
+                </button>
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

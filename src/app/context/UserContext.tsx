@@ -7,15 +7,20 @@ interface User {
   email: string;
   id: string;
   type?: string;
+  phone?: string;
+  recovery_email?: string;
+  alternate_contact?: string;
 }
 
 interface UserContextType {
   user: User | null;
+  setUser: (user: User | null) => void;
   login: (email: string, password: string) => Promise<void>;
   register: (userData: {
     name: string;
     email: string;
     password: string;
+    user_type: 'camera' | 'monitor';
   }) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
@@ -50,6 +55,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
         email: userData.email,
         name: userData.name,
         cameraId: userData.camera_id,
+        phone: userData.phone,
+        recovery_email: userData.recovery_email,
+        alternate_contact: userData.alternate_contact,
       };
       setUser(userObj);
       localStorage.setItem("aegis_user", JSON.stringify(userObj));
@@ -77,6 +85,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
         email: userData.email,
         name: userData.name,
         cameraId: userData.camera_id,
+        phone: userData.phone,
+        recovery_email: userData.recovery_email,
+        alternate_contact: userData.alternate_contact,
       };
       
       setUser(userObj);
@@ -110,6 +121,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
         name: userInfo.name,
         type: userInfo.user_type,
         cameraId: userInfo.camera_id,
+        phone: userInfo.phone,
+        recovery_email: userInfo.recovery_email,
+        alternate_contact: userInfo.alternate_contact,
       };
       
       setUser(userObj);

@@ -41,6 +41,23 @@ def load_users():
         try:
             with open(USER_DB_FILE, 'r') as f:
                 users_db = json.load(f)
+                
+            # Add new fields to existing users if they don't exist
+            for email, user in users_db.items():
+                if "phone" not in user:
+                    user["phone"] = None
+                if "recovery_email" not in user:
+                    user["recovery_email"] = None
+                if "alternate_contact" not in user:
+                    user["alternate_contact"] = None
+                if "camera_id" not in user and user.get("user_type") == "camera":
+                    user["camera_id"] = f"CAM-{secrets.token_hex(4).upper()}"
+                elif "camera_id" not in user:
+                    user["camera_id"] = None
+                    
+            # Save updated structure
+            save_users()
+            
         except Exception as e:
             print(f"Error loading users: {e}")
             users_db = {}
@@ -53,7 +70,11 @@ def load_users():
                 "name": "Test User",
                 "user_type": "monitor",
                 "hashed_password": hash_password("test123"),
-                "created_at": datetime.now().isoformat()
+                "created_at": datetime.now().isoformat(),
+                "phone": None,
+                "recovery_email": None,
+                "alternate_contact": None,
+                "camera_id": None
             }
         }
         save_users()
@@ -125,6 +146,21 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class ProfileUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    recovery_email: Optional[str] = None
+    alternate_contact: Optional[str] = None
+    current_password: Optional[str] = None
+    new_password: Optional[str] = None
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ForgotPasswordAlternateRequest(BaseModel):
+    email: str
+    use_alternate: bool = False
+
 # Auth endpoints
 @app.post("/auth/register")
 async def register(request: RegisterRequest):
@@ -140,7 +176,11 @@ async def register(request: RegisterRequest):
         "name": request.name,
         "user_type": request.user_type,
         "hashed_password": hashed_password,
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
+        "phone": None,
+        "recovery_email": None,
+        "alternate_contact": None,
+        "camera_id": None if request.user_type != "camera" else f"CAM-{secrets.token_hex(4).upper()}"
     }
     
     # Save users to file
@@ -199,7 +239,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                 "email": user["email"],
                 "name": user["name"],
                 "user_type": user.get("user_type", "monitor"),
-                "camera_id": user.get("camera_id")
+                "camera_id": user.get("camera_id"),
+                "phone": user.get("phone"),
+                "recovery_email": user.get("recovery_email"),
+                "alternate_contact": user.get("alternate_contact")
             }
     
     raise HTTPException(status_code=401, detail="User not found")
@@ -212,6 +255,101 @@ async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
         del tokens_db[token]
     
     return {"message": "Logged out successfully"}
+
+@app.put("/auth/profile")
+async def update_profile(request: ProfileUpdateRequest, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Update user profile"""
+    token = credentials.credentials
+    if token not in tokens_db:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    user_id = tokens_db[token]
+    
+    # Find and update user
+    for email, user in users_db.items():
+        if user["id"] == user_id:
+            # Handle password change if both current and new passwords provided
+            if request.current_password and request.new_password:
+                # Verify current password
+                if hash_password(request.current_password) != user["hashed_password"]:
+                    raise HTTPException(status_code=400, detail="Current password is incorrect")
+                
+                # Update password
+                user["hashed_password"] = hash_password(request.new_password)
+            
+            # Update other fields if provided
+            if request.name is not None:
+                user["name"] = request.name
+            
+            if request.phone is not None:
+                user["phone"] = request.phone
+            
+            if request.recovery_email is not None:
+                user["recovery_email"] = request.recovery_email
+            
+            if request.alternate_contact is not None:
+                user["alternate_contact"] = request.alternate_contact
+            
+            # Save changes
+            save_users()
+            
+            return {
+                "message": "Profile updated successfully",
+                "user": {
+                    "id": user["id"],
+                    "email": user["email"],
+                    "name": user["name"],
+                    "user_type": user.get("user_type", "monitor"),
+                    "camera_id": user.get("camera_id"),
+                    "phone": user.get("phone"),
+                    "recovery_email": user.get("recovery_email"),
+                    "alternate_contact": user.get("alternate_contact")
+                }
+            }
+    
+    raise HTTPException(status_code=401, detail="User not found")
+
+@app.post("/auth/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    """Send password reset link to email"""
+    if request.email not in users_db:
+        # For security, don't reveal if email exists or not
+        return {"message": "If the email exists, a reset link will be sent"}
+    
+    user = users_db[request.email]
+    
+    # TODO: Send actual email (for now, just return success)
+    # In production, you would:
+    # 1. Generate a reset token
+    # 2. Send email with reset link
+    # 3. Store token with expiration
+    
+    return {
+        "message": "Password reset link sent to email",
+        "email": request.email,
+        "recovery_email": user.get("recovery_email")
+    }
+
+@app.post("/auth/forgot-password-alternate")
+async def forgot_password_alternate(request: ForgotPasswordAlternateRequest):
+    """Send password reset link to alternate email"""
+    if request.email not in users_db:
+        # For security, don't reveal if email exists or not
+        return {"message": "If the email exists, a reset link will be sent"}
+    
+    user = users_db[request.email]
+    
+    if request.use_alternate and not user.get("alternate_contact"):
+        raise HTTPException(status_code=400, detail="No alternate contact available")
+    
+    target_email = user.get("alternate_contact") if request.use_alternate else request.email
+    
+    # TODO: Send actual email (for now, just return success)
+    return {
+        "message": f"Password reset link sent to {'alternate contact' if request.use_alternate else 'email'}",
+        "target_email": target_email,
+        "use_alternate": request.use_alternate
+    }
 
 # AI/Detection endpoints
 @app.post("/detect/objects")
