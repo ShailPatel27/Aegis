@@ -3,11 +3,15 @@ import { useUser } from "../context/UserContext";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { CountryCodeSelector } from "./CountryCodeSelector";
 import { ProfilePicture } from "./ProfilePicture";
+import { authAPI } from "../services/api";
 import {
   Camera,
   Check,
   X,
-  User
+  User,
+  Mail,
+  Edit2,
+  Save
 } from "lucide-react";
 
 interface UserProfileProps {
@@ -16,7 +20,7 @@ interface UserProfileProps {
 }
 
 export function UserProfile({ show, onClose }: UserProfileProps) {
-  const { user } = useUser();
+  const { user, setUser } = useUser();
   const { darkMode } = useSharedDarkMode();
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [showPhotoOptions, setShowPhotoOptions] = useState(false);
@@ -32,11 +36,16 @@ export function UserProfile({ show, onClose }: UserProfileProps) {
   const [recoveryEmailError, setRecoveryEmailError] = useState("");
   const [alternateContactError, setAlternateContactError] = useState("");
   const [countryCode, setCountryCode] = useState("+91");
-  const [alternateCountryCode, setAlternateCountryCode] = useState("+1");
+  const [alternateCountryCode, setAlternateCountryCode] = useState("+91");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  
+  // Recovery email editing states
+  const [isEditingRecoveryEmail, setIsEditingRecoveryEmail] = useState(false);
+  const [tempRecoveryEmail, setTempRecoveryEmail] = useState("");
+  const [isAddingRecoveryEmail, setIsAddingRecoveryEmail] = useState(false);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -111,6 +120,105 @@ export function UserProfile({ show, onClose }: UserProfileProps) {
     } else {
       setAlternateContactError("");
     }
+  };
+
+  const handleAddRecoveryEmail = async () => {
+    // Check authentication first
+    const token = localStorage.getItem('aegis_token');
+    console.log('Token check:', token ? 'Token exists' : 'No token found');
+    console.log('User email:', user?.email);
+    
+    if (!token) {
+      setSaveMessage("Authentication error. Please log in again.");
+      return;
+    }
+
+    if (!validateEmail(tempRecoveryEmail)) {
+      setRecoveryEmailError("Please enter a valid email address");
+      return;
+    }
+
+    // Check if recovery email is the same as primary email
+    if (tempRecoveryEmail === user?.email) {
+      setRecoveryEmailError("Recovery email cannot be the same as your primary email");
+      return;
+    }
+
+    console.log('Attempting to add recovery email:', tempRecoveryEmail);
+    console.log('Using token:', token.substring(0, 20) + '...');
+
+    setIsAddingRecoveryEmail(true);
+    setSaveMessage("");
+
+    try {
+      const response = await authAPI.addRecoveryEmail(token, tempRecoveryEmail);
+      
+      setRecoveryEmail(tempRecoveryEmail);
+      setTempRecoveryEmail("");
+      setIsEditingRecoveryEmail(false);
+      setSaveMessage("Recovery email added successfully! Verification email sent.");
+      
+      // Update user context with new recovery email
+      // Fetch updated user data to sync context
+      try {
+        const userResponse = await authAPI.getCurrentUser(token);
+        if (userResponse && userResponse.email) {
+          const updatedUser = {
+            id: userResponse.id,
+            email: userResponse.email,
+            name: userResponse.name,
+            cameraId: userResponse.camera_id,
+            phone: userResponse.phone,
+            recovery_email: userResponse.recovery_email,
+            alternate_contact: userResponse.alternate_contact,
+          };
+          
+          // Update both localStorage and user context
+          localStorage.setItem('aegis_user', JSON.stringify(updatedUser));
+          setUser(updatedUser);
+          console.log('User context updated with fresh data:', updatedUser);
+        }
+      } catch (error) {
+        console.error('Failed to refresh user data:', error);
+      }
+      
+      setTimeout(() => setSaveMessage(""), 5000);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to add recovery email";
+      
+      console.error('Recovery email error:', errorMessage);
+      
+      // Handle specific error cases
+      if (errorMessage.includes('No authentication token') || errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        setSaveMessage("Authentication error. Please log in again.");
+        // Clear invalid token
+        localStorage.removeItem('aegis_token');
+        localStorage.removeItem('aegis_user');
+      } else if (errorMessage.includes('Invalid email format')) {
+        setRecoveryEmailError("Invalid email format");
+      } else if (errorMessage.includes('Failed to send verification email')) {
+        setSaveMessage("Failed to send verification email. Please check your SMTP configuration.");
+      } else if (errorMessage.includes('already registered as a primary account')) {
+        setRecoveryEmailError("This email is already registered as a primary account");
+      } else if (errorMessage.includes('same as your primary email')) {
+        setRecoveryEmailError("Recovery email cannot be the same as your primary email");
+      } else {
+        setSaveMessage(errorMessage);
+      }
+    } finally {
+      setIsAddingRecoveryEmail(false);
+    }
+  };
+
+  const handleChangeRecoveryEmail = () => {
+    setTempRecoveryEmail(recoveryEmail);
+    setIsEditingRecoveryEmail(true);
+  };
+
+  const handleCancelRecoveryEmailEdit = () => {
+    setIsEditingRecoveryEmail(false);
+    setTempRecoveryEmail("");
+    setRecoveryEmailError("");
   };
 
   const handleProfilePictureUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -344,21 +452,109 @@ export function UserProfile({ show, onClose }: UserProfileProps) {
                   <label className={`block text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'} mb-2`}>
                     Recovery Email
                   </label>
-                  <input
-                    type="email"
-                    value={recoveryEmail}
-                    onChange={handleRecoveryEmailChange}
-                    placeholder="recovery@example.com"
-                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'
-                    } ${recoveryEmailError ? 'border-red-500' : ''}`}
-                  />
-                  {recoveryEmailError && (
-                    <p className="text-red-500 text-sm mt-1">{recoveryEmailError}</p>
+                  
+                  {!recoveryEmail && !isEditingRecoveryEmail ? (
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => setIsEditingRecoveryEmail(true)}
+                        className={`w-full px-4 py-2 border-2 border-dashed rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                          darkMode 
+                            ? 'border-gray-600 text-gray-400 hover:border-gray-500 hover:text-gray-300' 
+                            : 'border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-600'
+                        }`}
+                      >
+                        <Mail size={16} />
+                        Add Recovery Email
+                      </button>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Used for account recovery and notifications
+                      </p>
+                    </div>
+                  ) : isEditingRecoveryEmail ? (
+                    <div className="space-y-3">
+                      <input
+                        type="email"
+                        value={tempRecoveryEmail}
+                        onChange={(e) => {
+                          setTempRecoveryEmail(e.target.value);
+                          if (recoveryEmailError) setRecoveryEmailError("");
+                        }}
+                        placeholder="recovery@example.com"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'
+                        } ${recoveryEmailError ? 'border-red-500' : ''}`}
+                      />
+                      {recoveryEmailError && (
+                        <p className="text-red-500 text-sm">{recoveryEmailError}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleAddRecoveryEmail}
+                          disabled={isAddingRecoveryEmail || !tempRecoveryEmail}
+                          className={`px-3 py-2 rounded text-sm font-medium transition-colors flex items-center gap-2 ${
+                            isAddingRecoveryEmail || !tempRecoveryEmail
+                              ? 'bg-gray-400 cursor-not-allowed text-white'
+                              : 'bg-blue-600 hover:bg-blue-700 text-white'
+                          }`}
+                        >
+                          {isAddingRecoveryEmail ? (
+                            <>
+                              <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                              Adding...
+                            </>
+                          ) : (
+                            <>
+                              <Save size={14} />
+                              Add Email
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={handleCancelRecoveryEmailEdit}
+                          className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                            darkMode 
+                              ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        A verification email will be sent to this address
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="email"
+                          value={recoveryEmail}
+                          disabled
+                          className={`flex-1 px-4 py-2 border rounded-lg ${
+                            darkMode 
+                              ? 'bg-gray-700 border-gray-600 text-white opacity-60 cursor-not-allowed' 
+                              : 'bg-gray-100 border-gray-300 text-gray-600 cursor-not-allowed'
+                          }`}
+                        />
+                        <button
+                          onClick={handleChangeRecoveryEmail}
+                          className={`p-2 rounded-lg transition-colors ${
+                            darkMode 
+                              ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                          title="Change recovery email"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                      </div>
+                      <p className={`text-xs ${darkMode ? 'text-green-400' : 'text-green-600'} flex items-center gap-1`}>
+                        <Check size={12} />
+                        Verification email sent to this address
+                      </p>
+                    </div>
                   )}
-                  <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Used for account recovery and notifications
-                  </p>
                 </div>
                 <div>
                   <label className={`block text-sm font-medium ${darkMode ? 'text-gray-200' : 'text-gray-700'} mb-2`}>
@@ -375,7 +571,7 @@ export function UserProfile({ show, onClose }: UserProfileProps) {
                       type="tel"
                       value={alternateContact}
                       onChange={handleAlternateContactChange}
-                      placeholder="555-123-4567"
+                      placeholder="99887 76655"
                       className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                         darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300 bg-white'
                       } ${alternateContactError ? 'border-red-500' : ''}`}

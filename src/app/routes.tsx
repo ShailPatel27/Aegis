@@ -10,12 +10,22 @@ import { Settings } from "./components/Settings";
 import { CameraConfig } from "./components/CameraConfig";
 import { UserTypeSelection } from "./components/UserTypeSelection";
 import { LoginSignup } from "./components/LoginSignup";
+import { ResetPassword } from "./components/ResetPassword";
+import { VerificationCodeReset } from "./components/VerificationCodeReset";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 export const router = createBrowserRouter([
   {
     path: "/",
     element: <LoginSignup />,
+  },
+  {
+    path: "/reset-password",
+    element: <ResetPassword />,
+  },
+  {
+    path: "/reset-password-code",
+    element: <VerificationCodeReset onBack={() => window.history.back()} />,
   },
   {
     path: "/select-type",

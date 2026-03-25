@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useUser } from "../context/UserContext";
-import { Camera, Monitor, AlertCircle, Mail, Phone } from "lucide-react";
+import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
+import { CountryCodeSelector } from "./CountryCodeSelector";
+import { Eye, EyeOff, Mail, Lock, User, Phone } from "lucide-react";
+import { Camera, Monitor, AlertCircle } from "lucide-react";
 
 export function LoginSignup() {
   const navigate = useNavigate();
@@ -272,24 +275,40 @@ export function LoginSignup() {
                 <input
                   type="password"
                   required
-                  value={formData.confirmPassword}
+                  value={formData.password}
                   onChange={(e) =>
-                    setFormData({ ...formData, confirmPassword: e.target.value })
+                    setFormData({ ...formData, password: e.target.value })
                   }
                   className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Confirm your password"
+                  placeholder="Enter your password"
                   maxLength={72}
                 />
               </div>
+
+              {isSignup && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-200 mb-2">
+                    Confirm Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={formData.confirmPassword}
+                    onChange={(e) =>
+                      setFormData({ ...formData, confirmPassword: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Confirm your password"
+                    maxLength={72}
+                  />
+                </div>
+              )}
 
               {/* Forgot Password Link */}
               <div className="text-right">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowForgotPasswordUI(true);
-                    setForgotPasswordEmail(formData.email);
-                  }}
+                  onClick={() => navigate("/reset-password-code")}
                   className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
                 >
                   Forgot Password?

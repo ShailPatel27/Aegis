@@ -17,6 +17,10 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 import json
 from dotenv import load_dotenv
+import aiosmtplib
+from email.message import EmailMessage
+import re
+import uuid
 
 # Load environment variables
 load_dotenv()
@@ -24,15 +28,18 @@ load_dotenv()
 # Global variables for models
 yolo_model = None
 
-# In-memory storage for demo purposes (no database)
+# Database storage (in production, use proper database)
 users_db = {}
 tokens_db = {}
+verification_codes_db = {}  # Store verification codes
+reset_tokens = {}  # For password reset tokens
 
 # File-based persistence
 import json
 import os
 
 USER_DB_FILE = "users.json"
+VERIFICATION_CODES_FILE = "verification_codes.json"
 
 def load_users():
     """Load users from file"""
@@ -54,6 +61,10 @@ def load_users():
                     user["camera_id"] = f"CAM-{secrets.token_hex(4).upper()}"
                 elif "camera_id" not in user:
                     user["camera_id"] = None
+                if "email_verified" not in user:
+                    user["email_verified"] = True
+                if "phone_verified" not in user:
+                    user["phone_verified"] = False
                     
             # Save updated structure
             save_users()
@@ -74,7 +85,9 @@ def load_users():
                 "phone": None,
                 "recovery_email": None,
                 "alternate_contact": None,
-                "camera_id": None
+                "camera_id": None,
+                "email_verified": True,
+                "phone_verified": False
             }
         }
         save_users()
@@ -97,10 +110,34 @@ def load_models():
     except Exception as e:
         print(f"Error loading models: {e}")
 
+def generate_verification_code():
+    """Generate 6-digit verification code"""
+    return ''.join(secrets.choice('0123456789') for _ in range(6))
+
+def save_verification_codes():
+    """Save verification codes to file"""
+    try:
+        with open(VERIFICATION_CODES_FILE, "w") as f:
+            json.dump(verification_codes_db, f, indent=2)
+    except Exception as e:
+        print(f"Error saving verification codes: {e}")
+
+def load_verification_codes():
+    """Load verification codes from file"""
+    global verification_codes_db
+    try:
+        if os.path.exists(VERIFICATION_CODES_FILE):
+            with open(VERIFICATION_CODES_FILE, "r") as f:
+                verification_codes_db = json.load(f)
+    except Exception as e:
+        print(f"Error loading verification codes: {e}")
+        verification_codes_db = {}
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     load_users()
+    load_verification_codes()
     load_models()
     print("Backend server started successfully (standalone mode)")
     yield
@@ -129,6 +166,58 @@ def create_access_token():
     """Create a simple access token"""
     return secrets.token_urlsafe(32)
 
+def create_reset_token():
+    """Create a password reset token"""
+    return str(uuid.uuid4())
+
+async def send_email(to_email: str, subject: str, html_content: str):
+    """Send email using SMTP"""
+    try:
+        message = EmailMessage()
+        message["From"] = os.getenv("USER_EMAIL")
+        message["To"] = to_email
+        message["Subject"] = subject
+        message.set_content(html_content, subtype='html')
+        
+        await aiosmtplib.send(
+            message,
+            hostname=os.getenv("SMTP_HOST", "smtp.gmail.com"),
+            port=int(os.getenv("SMTP_PORT", 587)),
+            start_tls=True,
+            username=os.getenv("USER_EMAIL"),
+            password=os.getenv("USER_PASS"),
+        )
+        print(f"Email sent successfully to {to_email}")
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return False
+
+def validate_email(email: str) -> bool:
+    """Validate email format"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def validate_phone(phone: str) -> bool:
+    """Validate phone number (digits only, 10-15 digits)"""
+    if not phone:
+        return False
+    return phone.isdigit() and 10 <= len(phone) <= 15
+
+def is_email_unique(email: str, exclude_current: str = None) -> bool:
+    """Check if email is unique (excluding current user's email)"""
+    for user_email in users_db.keys():
+        if user_email != exclude_current and user_email == email:
+            return False
+    return True
+
+def is_phone_unique(phone: str, exclude_current: str = None) -> bool:
+    """Check if phone is unique (excluding current user's phone)"""
+    for user in users_db.values():
+        if user.get("phone") and user["phone"] != exclude_current and user["phone"] == phone:
+            return False
+    return True
+
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> bool:
     """Verify access token"""
     token = credentials.credentials
@@ -146,6 +235,26 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class VerificationCodeRequest(BaseModel):
+    email: str
+
+class VerifyCodeRequest(BaseModel):
+    email: str
+    code: str
+
+class ResetPasswordWithCodeRequest(BaseModel):
+    email: str
+    code: str
+    new_password: str
+
+class ForgotPasswordAlternateRequest(BaseModel):
+    email: str
+    use_alternate: bool = False
+
+class PasswordResetRequest(BaseModel):
+    token: str
+    new_password: str
+
 class ProfileUpdateRequest(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
@@ -154,18 +263,19 @@ class ProfileUpdateRequest(BaseModel):
     current_password: Optional[str] = None
     new_password: Optional[str] = None
 
-class ForgotPasswordRequest(BaseModel):
-    email: str
-
-class ForgotPasswordAlternateRequest(BaseModel):
-    email: str
-    use_alternate: bool = False
+class RecoveryEmailRequest(BaseModel):
+    recovery_email: str
 
 # Auth endpoints
 @app.post("/auth/register")
 async def register(request: RegisterRequest):
     """Register a new user"""
-    if request.email in users_db:
+    # Validate email format
+    if not validate_email(request.email):
+        raise HTTPException(status_code=400, detail="Invalid email format")
+    
+    # Check if email already exists
+    if not is_email_unique(request.email):
         raise HTTPException(status_code=400, detail="Email already registered")
     
     hashed_password = hash_password(request.password)
@@ -180,7 +290,9 @@ async def register(request: RegisterRequest):
         "phone": None,
         "recovery_email": None,
         "alternate_contact": None,
-        "camera_id": None if request.user_type != "camera" else f"CAM-{secrets.token_hex(4).upper()}"
+        "camera_id": None if request.user_type != "camera" else f"CAM-{secrets.token_hex(4).upper()}",
+        "email_verified": True,
+        "phone_verified": False
     }
     
     # Save users to file
@@ -256,6 +368,62 @@ async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
     
     return {"message": "Logged out successfully"}
 
+@app.post("/auth/recovery-email")
+async def add_recovery_email(request: RecoveryEmailRequest, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Add or update recovery email with verification"""
+    token = credentials.credentials
+    if token not in tokens_db:
+        raise HTTPException(status_code=401, detail="Invalid authentication token")
+    
+    user_id = tokens_db[token]
+    
+    # Validate email format
+    if not validate_email(request.recovery_email):
+        raise HTTPException(status_code=400, detail="Invalid recovery email format")
+    
+    # Find and update user
+    for email, user in users_db.items():
+        if user["id"] == user_id:
+            # Check if recovery email is the same as primary email
+            if request.recovery_email == user["email"]:
+                raise HTTPException(status_code=400, detail="Recovery email cannot be the same as your primary email")
+            
+            # Check if recovery email is already registered as a primary account
+            if request.recovery_email in users_db:
+                raise HTTPException(status_code=400, detail="This email is already registered as a primary account")
+            
+            # Send verification email to recovery email
+            html_content = f"""
+            <html>
+                <body>
+                    <h2>Recovery Email Verification</h2>
+                    <p>Hello,</p>
+                    <p>{user['name']} ({user['email']}) has added you as a recovery contact for their AEGIS account.</p>
+                    <p>If this is correct, no action is needed. Your email may be used to send password reset links if {user['name']} loses access to their account.</p>
+                    <p>If you don't recognize this, you can safely ignore this email.</p>
+                    <br>
+                    <p>Best regards,<br>AEGIS Team</p>
+                </body>
+            </html>
+            """
+            
+            # Send verification email
+            email_sent = await send_email(request.recovery_email, "AEGIS - Added as Recovery Contact", html_content)
+            
+            if email_sent:
+                # Update user's recovery email
+                user["recovery_email"] = request.recovery_email
+                save_users()
+                
+                return {
+                    "message": "Recovery email added successfully. Verification email sent.",
+                    "recovery_email": request.recovery_email
+                }
+            else:
+                raise HTTPException(status_code=500, detail="Failed to send verification email. Please check your SMTP configuration.")
+    
+    raise HTTPException(status_code=401, detail="User not found")
+
 @app.put("/auth/profile")
 async def update_profile(request: ProfileUpdateRequest, credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Update user profile"""
@@ -277,18 +445,29 @@ async def update_profile(request: ProfileUpdateRequest, credentials: HTTPAuthori
                 # Update password
                 user["hashed_password"] = hash_password(request.new_password)
             
-            # Update other fields if provided
+            # Validate and update phone if provided
+            if request.phone is not None:
+                if request.phone and not validate_phone(request.phone):
+                    raise HTTPException(status_code=400, detail="Invalid phone number format")
+                if request.phone and not is_phone_unique(request.phone, exclude_current=user.get("phone")):
+                    raise HTTPException(status_code=400, detail="Phone number already in use")
+                user["phone"] = request.phone or None
+            
+            # Validate and update recovery email if provided
+            if request.recovery_email is not None:
+                if request.recovery_email and not validate_email(request.recovery_email):
+                    raise HTTPException(status_code=400, detail="Invalid recovery email format")
+                user["recovery_email"] = request.recovery_email or None
+            
+            # Validate and update alternate contact if provided
+            if request.alternate_contact is not None:
+                if request.alternate_contact and not validate_email(request.alternate_contact):
+                    raise HTTPException(status_code=400, detail="Invalid alternate contact email format")
+                user["alternate_contact"] = request.alternate_contact or None
+            
+            # Update name if provided
             if request.name is not None:
                 user["name"] = request.name
-            
-            if request.phone is not None:
-                user["phone"] = request.phone
-            
-            if request.recovery_email is not None:
-                user["recovery_email"] = request.recovery_email
-            
-            if request.alternate_contact is not None:
-                user["alternate_contact"] = request.alternate_contact
             
             # Save changes
             save_users()
@@ -303,52 +482,143 @@ async def update_profile(request: ProfileUpdateRequest, credentials: HTTPAuthori
                     "camera_id": user.get("camera_id"),
                     "phone": user.get("phone"),
                     "recovery_email": user.get("recovery_email"),
-                    "alternate_contact": user.get("alternate_contact")
+                    "alternate_contact": user.get("alternate_contact"),
+                    "email_verified": user.get("email_verified", True),
+                    "phone_verified": user.get("phone_verified", False)
                 }
             }
-    
-    raise HTTPException(status_code=401, detail="User not found")
 
-@app.post("/auth/forgot-password")
-async def forgot_password(request: ForgotPasswordRequest):
-    """Send password reset link to email"""
-    if request.email not in users_db:
-        # For security, don't reveal if email exists or not
-        return {"message": "If the email exists, a reset link will be sent"}
+@app.post("/auth/send-verification-code")
+async def send_verification_code(request: VerificationCodeRequest):
+    """Send 6-digit verification code to email"""
+    email = request.email.lower().strip()
     
-    user = users_db[request.email]
+    # Check if email exists (either primary or recovery)
+    user_found = None
+    for user_email, user_data in users_db.items():
+        if user_email == email or user_data.get("recovery_email") == email:
+            user_found = user_data
+            break
     
-    # TODO: Send actual email (for now, just return success)
-    # In production, you would:
-    # 1. Generate a reset token
-    # 2. Send email with reset link
-    # 3. Store token with expiration
+    if not user_found:
+        # Don't reveal if email exists or not for security
+        return {"message": "If the email exists, a verification code will be sent"}
     
+    # Generate and store verification code
+    code = generate_verification_code()
+    verification_codes_db[email] = {
+        "code": code,
+        "created_at": datetime.now().isoformat(),
+        "attempts": 0
+    }
+    save_verification_codes()
+    
+    # Send verification email
+    html_content = f"""
+    <html>
+        <body>
+            <h2>AEGIS Password Reset Code</h2>
+            <p>Hello,</p>
+            <p>Your verification code is: <strong style="font-size: 24px; color: #007bff;">{code}</strong></p>
+            <p>This code will expire in 10 minutes.</p>
+            <p>If you didn't request this code, you can safely ignore this email.</p>
+            <br>
+            <p>Best regards,<br>AEGIS Team</p>
+        </body>
+    </html>
+    """
+    
+    # Send email
+    email_sent = await send_email(email, "AEGIS - Password Reset Code", html_content)
+    
+    if email_sent:
+        return {
+            "message": "Verification code sent successfully",
+            "expires_in": "10 minutes"
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send verification email")
+
+@app.post("/auth/verify-code")
+async def verify_code(request: VerifyCodeRequest):
+    """Verify 6-digit code"""
+    email = request.email.lower().strip()
+    code = request.code.strip()
+    
+    if email not in verification_codes_db:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+    
+    stored_data = verification_codes_db[email]
+    
+    # Check if code matches
+    if stored_data["code"] != code:
+        stored_data["attempts"] += 1
+        save_verification_codes()
+        
+        if stored_data["attempts"] >= 3:
+            # Remove code after 3 failed attempts
+            del verification_codes_db[email]
+            save_verification_codes()
+            raise HTTPException(status_code=400, detail="Too many failed attempts. Please request a new code.")
+        
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+    
+    # Check if code is expired (10 minutes)
+    created_at = datetime.fromisoformat(stored_data["created_at"])
+    if datetime.now() - created_at > timedelta(minutes=10):
+        del verification_codes_db[email]
+        save_verification_codes()
+        raise HTTPException(status_code=400, detail="Verification code has expired")
+    
+    # Code is valid
     return {
-        "message": "Password reset link sent to email",
-        "email": request.email,
-        "recovery_email": user.get("recovery_email")
+        "message": "Code verified successfully",
+        "email": email
     }
 
-@app.post("/auth/forgot-password-alternate")
-async def forgot_password_alternate(request: ForgotPasswordAlternateRequest):
-    """Send password reset link to alternate email"""
-    if request.email not in users_db:
-        # For security, don't reveal if email exists or not
-        return {"message": "If the email exists, a reset link will be sent"}
+@app.post("/auth/reset-password-with-code")
+async def reset_password_with_code(request: ResetPasswordWithCodeRequest):
+    """Reset password using verified code"""
+    email = request.email.lower().strip()
+    code = request.code.strip()
+    new_password = request.new_password
     
-    user = users_db[request.email]
+    # Verify code again (double security)
+    if email not in verification_codes_db:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
     
-    if request.use_alternate and not user.get("alternate_contact"):
-        raise HTTPException(status_code=400, detail="No alternate contact available")
+    stored_data = verification_codes_db[email]
+    if stored_data["code"] != code:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
     
-    target_email = user.get("alternate_contact") if request.use_alternate else request.email
+    # Check if code is expired
+    created_at = datetime.fromisoformat(stored_data["created_at"])
+    if datetime.now() - created_at > timedelta(minutes=10):
+        del verification_codes_db[email]
+        save_verification_codes()
+        raise HTTPException(status_code=400, detail="Verification code has expired")
     
-    # TODO: Send actual email (for now, just return success)
+    # Find user and update password
+    user_found = False
+    for user_email, user_data in users_db.items():
+        if user_email == email or user_data.get("recovery_email") == email:
+            # Hash new password
+            hashed_password = hashlib.sha256(new_password.encode()).hexdigest()
+            user_data["hashed_password"] = hashed_password
+            user_found = True
+            break
+    
+    if not user_found:
+        raise HTTPException(status_code=400, detail="User not found")
+    
+    # Remove verification code after successful use
+    del verification_codes_db[email]
+    save_verification_codes()
+    save_users()
+    
     return {
-        "message": f"Password reset link sent to {'alternate contact' if request.use_alternate else 'email'}",
-        "target_email": target_email,
-        "use_alternate": request.use_alternate
+        "message": "Password reset successfully",
+        "email": email
     }
 
 # AI/Detection endpoints

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AEGIS Auth Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        button { padding: 10px 15px; margin: 5px; }
+        input { padding: 8px; margin: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>AEGIS Authentication Test</h1>
+    
+    <div class="section">
+        <h2>1. Login</h2>
+        <input type="email" id="email" placeholder="Email" value="shailpatel279@gmail.com">
+        <input type="password" id="password" placeholder="Password" value="test123">
+        <button onclick="login()">Login</button>
+        <div id="loginResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>2. Check Token</h2>
+        <button onclick="checkToken()">Check Current Token</button>
+        <div id="tokenResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>3. Add Recovery Email</h2>
+        <input type="email" id="recoveryEmail" placeholder="Recovery Email" value="recoverytest@gmail.com">
+        <button onclick="addRecoveryEmail()">Add Recovery Email</button>
+        <div id="recoveryResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>4. Test Validations</h2>
+        <button onclick="testSameEmail()">Test Same Email</button>
+        <button onclick="testInvalidEmail()">Test Invalid Email</button>
+        <button onclick="testNoToken()">Test No Token</button>
+        <div id="validationResult"></div>
+    </div>
+
+    <script>
+        let currentToken = null;
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('loginResult');
+            
+            try {
+                const response = await fetch('http://localhost:8000/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentToken = data.access_token;
+                    localStorage.setItem('aegis_token', currentToken);
+                    resultDiv.innerHTML = `<div class="success">✅ Login successful! Token stored.</div>`;
+                    resultDiv.innerHTML += `<div class="info">User: ${data.user.name} (${data.user.email})</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Login failed: ${data.detail}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+            }
+        }
+
+        function checkToken() {
+            const token = localStorage.getItem('aegis_token');
+            const resultDiv = document.getElementById('tokenResult');
+            
+            if (token) {
+                resultDiv.innerHTML = `<div class="success">✅ Token found: ${token.substring(0, 20)}...</div>`;
+            } else {
+                resultDiv.innerHTML = `<div class="error">❌ No token found in localStorage</div>`;
+            }
+        }
+
+        async function addRecoveryEmail() {
+            const recoveryEmail = document.getElementById('recoveryEmail').value;
+            const token = localStorage.getItem('aegis_token');
+            const resultDiv = document.getElementById('recoveryResult');
+            
+            if (!token) {
+                resultDiv.innerHTML = `<div class="error">❌ No token found. Please login first.</div>`;
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:8000/auth/recovery-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ recovery_email: recoveryEmail })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✅ ${data.message}</div>`;
+                    resultDiv.innerHTML += `<div class="info">Recovery email: ${data.recovery_email}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Failed: ${data.detail}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+            }
+        }
+
+        async function testSameEmail() {
+            const token = localStorage.getItem('aegis_token');
+            const resultDiv = document.getElementById('validationResult');
+            
+            if (!token) {
+                resultDiv.innerHTML = `<div class="error">❌ No token found</div>`;
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:8000/auth/recovery-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ recovery_email: 'shailpatel279@gmail.com' })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="error">❌ Should have failed but succeeded</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="success">✅ Correctly rejected: ${data.detail}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+            }
+        }
+
+        async function testInvalidEmail() {
+            const token = localStorage.getItem('aegis_token');
+            const resultDiv = document.getElementById('validationResult');
+            
+            if (!token) {
+                resultDiv.innerHTML = `<div class="error">❌ No token found</div>`;
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:8000/auth/recovery-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ recovery_email: 'invalid-email' })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="error">❌ Should have failed but succeeded</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="success">✅ Correctly rejected: ${data.detail}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+            }
+        }
+
+        async function testNoToken() {
+            const resultDiv = document.getElementById('validationResult');
+            
+            // Clear token temporarily
+            const originalToken = localStorage.getItem('aegis_token');
+            localStorage.removeItem('aegis_token');
+            
+            try {
+                const response = await fetch('http://localhost:8000/auth/recovery-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer invalid_token'
+                    },
+                    body: JSON.stringify({ recovery_email: 'test@example.com' })
+                });
+                
+                if (response.status === 401) {
+                    resultDiv.innerHTML = `<div class="success">✅ Correctly rejected unauthorized request</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Should have returned 401 but got ${response.status}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+            } finally {
+                // Restore token
+                if (originalToken) {
+                    localStorage.setItem('aegis_token', originalToken);
+                }
+            }
+        }
+
+        // Check token on page load
+        window.onload = function() {
+            checkToken();
+        };
+    </script>
+</body>
+</html>
