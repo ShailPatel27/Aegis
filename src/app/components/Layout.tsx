@@ -17,7 +17,8 @@ import {
   User,
   Video,
   AlertTriangle,
-  Cog
+  Cog,
+  Monitor
 } from "lucide-react";
 
 // Camera-specific navigation
@@ -75,7 +76,7 @@ export function Layout() {
       {/* Sidebar */}
       <aside className={`bg-gray-900 text-white flex flex-col transition-all duration-300 border-r ${
         sidebarVisible ? "w-64 border-gray-700" : "w-0 border-transparent"
-      } overflow-hidden`}>
+      } overflow-hidden overflow-y-auto scrollbar-hide`}>
         {/* Logo with Menu Toggle */}
         <div className="p-6 border-b border-gray-800 flex items-center gap-4">
           <button
@@ -132,6 +133,26 @@ export function Layout() {
               <p className="text-sm font-medium">{user?.name || "Guest User"}</p>
               <p className="text-xs text-gray-400">{user?.email || "guest@aegis.com"}</p>
             </div>
+          </button>
+          {/* Switch Interface Button */}
+          <button
+            onClick={() => {
+              const isCamera = location.pathname.startsWith('/camera');
+              navigate(isCamera ? "/monitor/dashboard" : "/camera/dashboard");
+            }}
+            className="flex items-center gap-2 w-full px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg mb-2 transition-colors"
+          >
+            {location.pathname.startsWith('/camera') ? (
+              <>
+                <Monitor size={18} />
+                <span>Switch to Monitor</span>
+              </>
+            ) : (
+              <>
+                <Camera size={18} />
+                <span>Switch to Camera</span>
+              </>
+            )}
           </button>
           <button
             onClick={handleLogout}

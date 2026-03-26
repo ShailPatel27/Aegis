@@ -42,3 +42,13 @@
 .dark .country-dropdown-scroll::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
 }
+
+/* Hide scrollbar */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
