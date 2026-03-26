@@ -142,7 +142,7 @@ export function ProfileModal({ show, onClose }: ProfileModalProps) {
         return;
       }
 
-      const response = await fetch('http://localhost:8000/auth/profile', {
+      const response = await fetch('http://localhost:8000/api/v1/auth/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

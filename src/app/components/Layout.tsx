@@ -22,25 +22,26 @@ import {
 
 // Camera-specific navigation
 const cameraNavItems = [
-  { path: "/dashboard", label: "Dashboard", icon: Home },
-  { path: "/live", label: "Live Monitoring", icon: Video },
-  { path: "/faces", label: "Face Recognition", icon: User },
-  { path: "/alerts", label: "Alerts", icon: AlertTriangle },
-  { path: "/analytics", label: "Analytics", icon: BarChart3 },
-  { path: "/camera-config", label: "Camera Configuration", icon: Cog },
-  { path: "/settings", label: "Settings", icon: Settings },
+  { path: "/camera/dashboard", label: "Dashboard", icon: Home },
+  { path: "/camera/add-camera", label: "Add Camera", icon: Camera },
+  { path: "/camera/live", label: "Live Monitoring", icon: Video },
+  { path: "/camera/faces", label: "Face Recognition", icon: User },
+  { path: "/camera/alerts", label: "Alerts", icon: AlertTriangle },
+  { path: "/camera/analytics", label: "Analytics", icon: BarChart3 },
+  { path: "/camera/camera-config", label: "Camera Configuration", icon: Cog },
+  { path: "/camera/settings", label: "Settings", icon: Settings },
 ];
 
 // Monitor-specific navigation
 const monitorNavItems = [
-  { path: "/dashboard", label: "Dashboard", icon: Home },
-  { path: "/live", label: "Live Monitoring", icon: Video },
-  { path: "/faces", label: "Face Recognition", icon: User },
-  { path: "/alerts", label: "Alerts", icon: AlertTriangle },
-  { path: "/analytics", label: "Analytics", icon: BarChart3 },
-  { path: "/add-camera", label: "Add Camera", icon: Camera },
-  { path: "/camera-config", label: "Camera Configuration", icon: Cog },
-  { path: "/settings", label: "Settings", icon: Settings },
+  { path: "/monitor/dashboard", label: "Dashboard", icon: Home },
+  { path: "/monitor/add-camera", label: "Add Camera", icon: Camera },
+  { path: "/monitor/live", label: "Live Monitoring", icon: Video },
+  { path: "/monitor/faces", label: "Face Recognition", icon: User },
+  { path: "/monitor/alerts", label: "Alerts", icon: AlertTriangle },
+  { path: "/monitor/analytics", label: "Analytics", icon: BarChart3 },
+  { path: "/monitor/camera-config", label: "Camera Configuration", icon: Cog },
+  { path: "/monitor/settings", label: "Settings", icon: Settings },
 ];
 
 export function Layout() {
@@ -51,8 +52,8 @@ export function Layout() {
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [showUserProfile, setShowUserProfile] = useState(false);
 
-  // Choose navigation - use monitor navigation for all users now
-  const navItems = monitorNavItems;
+  // Choose navigation based on current route prefix
+  const navItems = location.pathname.startsWith('/camera') ? cameraNavItems : monitorNavItems;
 
   const handleLogout = () => {
     logout();

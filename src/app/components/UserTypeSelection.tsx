@@ -5,7 +5,12 @@ export function UserTypeSelection() {
   const navigate = useNavigate();
 
   const handleSelection = (type: "camera" | "monitor") => {
-    navigate("/dashboard");
+    // Navigate to specific add-camera routes
+    if (type === 'camera') {
+      navigate("/camera/dashboard");
+    } else {
+      navigate("/monitor/dashboard");
+    }
   };
 
   return (

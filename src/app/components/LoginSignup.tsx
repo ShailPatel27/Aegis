@@ -45,7 +45,7 @@ export function LoginSignup() {
           name: formData.name || "User",
           email: formData.email,
           password: formData.password,
-          user_type: "monitor"
+          user_type: "camera" // All users are just users, no type distinction
         });
         navigate("/select-type");
       } else {
@@ -68,7 +68,7 @@ export function LoginSignup() {
 
     try {
       const endpoint = usePhoneForReset ? "/auth/forgot-password-alternate" : "/auth/forgot-password";
-      const response = await fetch(`http://localhost:8000${endpoint}`, {
+      const response = await fetch(`http://localhost:8000/api/v1${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -339,7 +339,7 @@ export function LoginSignup() {
           {/* Toggle Sign In/Sign Up */}
           {!showForgotPasswordUI && (
             <div className="mt-6 text-center">
-              <p className="text-gray-300">
+              <p className="text-gray-300 mb-3">
                 {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
                 <button
                   onClick={() => {

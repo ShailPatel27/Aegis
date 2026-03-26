@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, ShoppingBag, Building, GraduationCap, Star } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Check, ShoppingBag, Building, GraduationCap, Star, Camera, Play, Square } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 
 const predefinedTemplates = [
@@ -74,6 +74,16 @@ export function AddCamera() {
   const [showNameModal, setShowNameModal] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<CameraConfig | null>(null);
   const [cameraName, setCameraName] = useState("");
+  
+  // Camera source states - simplified for camera users (webcam only)
+  const [isWebcamActive, setIsWebcamActive] = useState(false);
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCamera, setSelectedCamera] = useState<string>('');
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
+  
+  // Refs for video stream
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   
   const [customConfig, setCustomConfig] = useState<CameraConfig>({
     objectDetection: true,
@@ -152,6 +162,187 @@ export function AddCamera() {
     },
   ]);
 
+  // Get available cameras on component mount
+  useEffect(() => {
+    const getCameras = async () => {
+      try {
+        console.log('Getting available cameras...');
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        console.log('All devices:', devices);
+        
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        console.log('Video devices:', videoDevices);
+        
+        setAvailableCameras(videoDevices);
+        
+        if (videoDevices.length > 0 && !selectedCamera) {
+          const firstCamera = videoDevices[0].deviceId;
+          console.log('Auto-selecting first camera:', firstCamera);
+          setSelectedCamera(firstCamera);
+        } else if (videoDevices.length === 0) {
+          console.log('No cameras found');
+          setConnectionStatus('error');
+        }
+      } catch (error) {
+        console.error('Error getting cameras:', error);
+        setConnectionStatus('error');
+      }
+    };
+
+    getCameras();
+  }, []);
+
+  const requestCameraPermission = async () => {
+    try {
+      console.log('Requesting camera permission...');
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: true, 
+        audio: false 
+      });
+      console.log('Permission granted, got stream:', stream);
+      
+      // Stop the stream immediately, we just wanted permission
+      stream.getTracks().forEach(track => track.stop());
+      
+      // Refresh camera list
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      setAvailableCameras(videoDevices);
+      
+      if (videoDevices.length > 0) {
+        setSelectedCamera(videoDevices[0].deviceId);
+        setConnectionStatus('idle');
+      }
+    } catch (error) {
+      console.error('Permission denied:', error);
+      if (error instanceof Error && error.name === 'NotAllowedError') {
+        alert('Camera permission denied. Please allow camera access in your browser settings.');
+      }
+    }
+  };
+
+  // Cleanup stream on unmount
+  useEffect(() => {
+    return () => {
+      stopWebcam();
+    };
+  }, []);
+
+  const startWebcam = async () => {
+    console.log('Starting webcam...');
+    console.log('Selected camera:', selectedCamera);
+    console.log('Video ref available:', !!videoRef.current);
+    
+    if (!videoRef.current) {
+      console.error('Video ref missing');
+      setConnectionStatus('error');
+      return;
+    }
+    
+    try {
+      setConnectionStatus('connecting');
+      
+      // Try with selected camera first, then fallback to any camera
+      let constraints: MediaStreamConstraints = {
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } as MediaTrackConstraints,
+        audio: false
+      };
+      
+      if (selectedCamera) {
+        constraints.video = {
+          deviceId: { exact: selectedCamera },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } as MediaTrackConstraints;
+      }
+      
+      console.log('Requesting media with constraints:', constraints);
+      
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log('Got stream with selected camera:', stream);
+        await setupStream(stream);
+      } catch (specificError) {
+        console.log('Failed with specific camera, trying any camera:', specificError);
+        
+        // Fallback to any camera
+        const fallbackConstraints: MediaStreamConstraints = {
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } as MediaTrackConstraints,
+          audio: false
+        };
+        
+        console.log('Requesting media with fallback constraints:', fallbackConstraints);
+        const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+        console.log('Got stream with fallback:', stream);
+        await setupStream(stream);
+      }
+      
+    } catch (error) {
+      console.error('Error accessing webcam:', error);
+      setConnectionStatus('error');
+      setIsWebcamActive(false);
+      
+      // Show user-friendly error
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError') {
+          alert('Camera access denied. Please allow camera permissions in your browser and refresh the page.');
+        } else if (error.name === 'NotFoundError') {
+          alert('No camera found. Please connect a camera and try again.');
+        } else if (error.name === 'NotReadableError') {
+          alert('Camera is already in use by another application.');
+        } else {
+          alert(`Camera error: ${error.message}`);
+        }
+      }
+    }
+  };
+
+  const setupStream = async (stream: MediaStream) => {
+    streamRef.current = stream;
+    videoRef.current!.srcObject = stream;
+    
+    videoRef.current!.onloadedmetadata = () => {
+      console.log('Video metadata loaded, playing...');
+      videoRef.current?.play();
+      setConnectionStatus('connected');
+      setIsWebcamActive(true);
+    };
+    
+    videoRef.current!.onerror = (error) => {
+      console.error('Video error:', error);
+      setConnectionStatus('error');
+      setIsWebcamActive(false);
+    };
+  };
+
+  const stopWebcam = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsWebcamActive(false);
+    setConnectionStatus('idle');
+  };
+
+  const switchCamera = (deviceId: string) => {
+    if (isWebcamActive) {
+      stopWebcam();
+      setSelectedCamera(deviceId);
+      setTimeout(() => startWebcam(), 100);
+    } else {
+      setSelectedCamera(deviceId);
+    }
+  };
+
   const applyPreset = (features: CameraConfig) => {
     setSelectedConfig(features);
     setShowNameModal(true);
@@ -220,6 +411,113 @@ export function AddCamera() {
       <div className="mb-6">
         <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Add Camera</h1>
         <p className={`mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Configure and deploy new camera with detection presets</p>
+      </div>
+
+      {/* Camera Setup - Webcam Only for Camera Users */}
+      <div className={`rounded-xl shadow-sm p-6 border mb-8 ${
+        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      }`}>
+        <div className="mb-6">
+          <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera Setup</h2>
+          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Configure your webcam for detection monitoring</p>
+        </div>
+
+        <div className="space-y-4">
+          {availableCameras.length > 0 ? (
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Select Camera
+              </label>
+              <select
+                value={selectedCamera}
+                onChange={(e) => switchCamera(e.target.value)}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                }`}
+              >
+                {availableCameras.map((camera) => (
+                  <option key={camera.deviceId} value={camera.deviceId}>
+                    {camera.label || `Camera ${camera.deviceId.slice(0, 8)}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className={`p-4 rounded-lg border-2 ${
+              darkMode ? 'bg-yellow-900 border-yellow-700' : 'bg-yellow-50 border-yellow-200'
+            }`}>
+              <div className="flex items-center gap-3 mb-3">
+                <Camera className={`w-6 h-6 ${darkMode ? 'text-yellow-400' : 'text-yellow-600'}`} />
+                <h3 className={`font-medium ${darkMode ? 'text-yellow-100' : 'text-yellow-800'}`}>
+                  No Cameras Found
+                </h3>
+              </div>
+              <p className={`text-sm mb-3 ${darkMode ? 'text-yellow-200' : 'text-yellow-700'}`}>
+                We couldn't find any cameras. You may need to grant camera permissions first.
+              </p>
+              <button
+                onClick={requestCameraPermission}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  darkMode 
+                    ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
+                    : 'bg-yellow-600 text-white hover:bg-yellow-700'
+                }`}
+              >
+                Request Camera Permission
+              </button>
+            </div>
+          )}
+
+          {availableCameras.length > 0 && (
+            <div className="flex items-center gap-4">
+              <button
+                onClick={isWebcamActive ? stopWebcam : startWebcam}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  isWebcamActive
+                    ? 'bg-red-600 text-white hover:bg-red-700'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
+              >
+                {isWebcamActive ? <Square size={16} /> : <Play size={16} />}
+                {isWebcamActive ? 'Stop Camera' : 'Start Camera'}
+              </button>
+
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
+                connectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                connectionStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
+                connectionStatus === 'error' ? 'bg-red-100 text-red-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${
+                  connectionStatus === 'connected' ? 'bg-green-500' :
+                  connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
+                  connectionStatus === 'error' ? 'bg-red-500' :
+                  'bg-gray-400'
+                }`} />
+                {connectionStatus === 'connected' ? 'Connected' :
+                 connectionStatus === 'connecting' ? 'Connecting...' :
+                 connectionStatus === 'error' ? 'Error' :
+                 'Idle'}
+              </div>
+            </div>
+          )}
+
+          {/* Video Preview */}
+          <div className={`rounded-lg overflow-hidden bg-black ${darkMode ? 'border border-gray-700' : ''}`}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-64 object-cover"
+            />
+            {!isWebcamActive && (
+              <div className="flex items-center justify-center h-64 bg-gray-900">
+                <p className="text-gray-400">Camera preview will appear here</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Predefined Templates */}

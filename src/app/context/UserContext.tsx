@@ -7,6 +7,7 @@ interface User {
   email: string;
   id: string;
   type?: string;
+  user_type?: 'camera' | 'monitor';
   phone?: string;
   recovery_email?: string;
   alternate_contact?: string;
@@ -54,6 +55,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         id: userData.id,
         email: userData.email,
         name: userData.name,
+        user_type: userData.user_type,
         cameraId: userData.camera_id,
         phone: userData.phone,
         recovery_email: userData.recovery_email,
@@ -84,6 +86,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         id: userData.id,
         email: userData.email,
         name: userData.name,
+        user_type: userData.user_type,
         cameraId: userData.camera_id,
         phone: userData.phone,
         recovery_email: userData.recovery_email,

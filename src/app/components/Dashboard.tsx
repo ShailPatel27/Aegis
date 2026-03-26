@@ -1,6 +1,7 @@
-import { Camera, AlertTriangle, Users, Activity } from "lucide-react";
+import { Camera, AlertTriangle, Users, Activity, Monitor } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
+import { useNavigate } from "react-router";
 
 const stats = [
   { label: "Total Detections Today", value: "1,247", icon: Activity, color: "bg-blue-500" },
@@ -28,6 +29,8 @@ const recentAlerts = [
 
 export function Dashboard() {
   const { darkMode } = useSharedDarkMode();
+  const navigate = useNavigate();
+  
   return (
     <div className="p-8">
       <div className="mb-8">

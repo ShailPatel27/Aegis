@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8000/api/v1';
 
 // User authentication API calls
 export const authAPI = {
@@ -22,7 +22,9 @@ export const authAPI = {
       throw new Error(error.detail || 'Registration failed');
     }
     
-    return response.json();
+    const result = await response.json();
+    // Handle new API structure: {success: true, data: {...}}
+    return result.success ? result.data : result;
   },
 
   // Login user
@@ -43,7 +45,9 @@ export const authAPI = {
       throw new Error(error.detail || 'Login failed');
     }
     
-    return response.json();
+    const result = await response.json();
+    // Handle new API structure: {success: true, data: {...}}
+    return result.success ? result.data : result;
   },
 
   // Get current user info

@@ -273,7 +273,7 @@ export function UserProfile({ show, onClose }: UserProfileProps) {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://localhost:8000/auth/profile', {
+      const response = await fetch('http://localhost:8000/api/v1/auth/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

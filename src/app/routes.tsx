@@ -6,6 +6,8 @@ import { FaceRecognition } from "./components/FaceRecognition";
 import { Alerts } from "./components/Alerts";
 import { Analytics } from "./components/Analytics";
 import { AddCamera } from "./components/AddCamera";
+import { MonitorDashboard } from "./components/MonitorDashboard";
+import { CameraOrMonitorRoute } from "./components/CameraOrMonitorRoute";
 import { Settings } from "./components/Settings";
 import { CameraConfig } from "./components/CameraConfig";
 import { UserTypeSelection } from "./components/UserTypeSelection";
@@ -32,7 +34,7 @@ export const router = createBrowserRouter([
     element: <UserTypeSelection />,
   },
   {
-    path: "/add-camera",
+    path: "/camera/add-camera",
     element: (
       <ProtectedRoute>
         <Layout />
@@ -43,7 +45,7 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "/dashboard",
+    path: "/camera/dashboard",
     element: (
       <ProtectedRoute>
         <Layout />
@@ -54,7 +56,51 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "/live",
+    path: "/monitor/add-camera",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <MonitorDashboard /> },
+    ],
+  },
+  {
+    path: "/monitor/dashboard",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Dashboard /> },
+    ],
+  },
+  {
+    path: "/add-camera",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <CameraOrMonitorRoute /> },
+    ],
+  },
+  {
+    path: "/camera/dashboard",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Dashboard /> },
+    ],
+  },
+  {
+    path: "/camera/live",
     element: (
       <ProtectedRoute>
         <Layout />
@@ -65,7 +111,7 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "/faces",
+    path: "/camera/faces",
     element: (
       <ProtectedRoute>
         <Layout />
@@ -76,7 +122,7 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "/alerts",
+    path: "/camera/alerts",
     element: (
       <ProtectedRoute>
         <Layout />
@@ -87,7 +133,7 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "/analytics",
+    path: "/camera/analytics",
     element: (
       <ProtectedRoute>
         <Layout />
@@ -98,7 +144,7 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "/camera-config",
+    path: "/camera/camera-config",
     element: (
       <ProtectedRoute>
         <Layout />
@@ -109,7 +155,84 @@ export const router = createBrowserRouter([
     ],
   },
   {
-    path: "/settings",
+    path: "/camera/settings",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Settings /> },
+    ],
+  },
+  {
+    path: "/monitor/dashboard",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Dashboard /> },
+    ],
+  },
+  {
+    path: "/monitor/live",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <LiveMonitoring /> },
+    ],
+  },
+  {
+    path: "/monitor/faces",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <FaceRecognition /> },
+    ],
+  },
+  {
+    path: "/monitor/alerts",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Alerts /> },
+    ],
+  },
+  {
+    path: "/monitor/analytics",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Analytics /> },
+    ],
+  },
+  {
+    path: "/monitor/camera-config",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <CameraConfig /> },
+    ],
+  },
+  {
+    path: "/monitor/settings",
     element: (
       <ProtectedRoute>
         <Layout />
