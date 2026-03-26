@@ -8,6 +8,15 @@ import { Camera, Monitor, AlertCircle } from "lucide-react";
 
 export function LoginSignup() {
   const navigate = useNavigate();
+  const { user } = useUser();
+
+  // Check for existing session on mount
+  useEffect(() => {
+    if (user) {
+      // User already logged in, redirect to dashboard
+      navigate("/select-type");
+    }
+  }, [user, navigate]);
   const { login, register, isLoading, error } = useUser();
   const [isSignup, setIsSignup] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);

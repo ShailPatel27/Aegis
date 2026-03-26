@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Check, ShoppingBag, Building, GraduationCap, Star, Camera, Play, Square } from "lucide-react";
+import { Check, ShoppingBag, Building, GraduationCap, Star, Camera, Play, Square, Maximize2 } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 
 const predefinedTemplates = [
@@ -84,6 +84,7 @@ export function AddCamera() {
   // Refs for video stream
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   const [customConfig, setCustomConfig] = useState<CameraConfig>({
     objectDetection: true,
@@ -333,6 +334,29 @@ export function AddCamera() {
     setConnectionStatus('idle');
   };
 
+  const toggleFullscreen = () => {
+    if (!videoRef.current) return;
+    
+    if (!isFullscreen) {
+      if (videoRef.current.requestFullscreen) {
+        videoRef.current.requestFullscreen();
+      } else if ((videoRef.current as any).webkitRequestFullscreen) {
+        (videoRef.current as any).webkitRequestFullscreen();
+      } else if ((videoRef.current as any).msRequestFullscreen) {
+        (videoRef.current as any).msRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      } else if ((document as any).msExitFullscreen) {
+        (document as any).msExitFullscreen();
+      }
+    }
+    setIsFullscreen(!isFullscreen);
+  };
+
   const switchCamera = (deviceId: string) => {
     if (isWebcamActive) {
       stopWebcam();
@@ -503,18 +527,28 @@ export function AddCamera() {
           )}
 
           {/* Video Preview */}
-          <div className={`rounded-lg overflow-hidden bg-black ${darkMode ? 'border border-gray-700' : ''}`}>
+          <div className={`rounded-lg overflow-hidden bg-black relative group ${darkMode ? 'border border-gray-700' : ''}`}>
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="w-full h-64 object-cover"
+              className="w-full h-64 object-contain"
             />
             {!isWebcamActive && (
               <div className="flex items-center justify-center h-64 bg-gray-900">
                 <p className="text-gray-400">Camera preview will appear here</p>
               </div>
+            )}
+            {/* Fullscreen button - appears on hover */}
+            {isWebcamActive && (
+              <button
+                onClick={toggleFullscreen}
+                className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Toggle Fullscreen"
+              >
+                <Maximize2 size={16} />
+              </button>
             )}
           </div>
         </div>

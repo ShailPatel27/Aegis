@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Wifi, Monitor, Plus, Settings, Eye, AlertTriangle, CameraOff } from "lucide-react";
+import { Wifi, Monitor, Plus, Settings, Eye, AlertTriangle, CameraOff, Play, Pause, Maximize2 } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { useUser } from "../context/UserContext";
 
@@ -25,6 +25,9 @@ export function MonitorDashboard() {
   const [newCameraType, setNewCameraType] = useState<'ip' | 'rtsp'>('ip');
   const [newCameraUrl, setNewCameraUrl] = useState('');
   const [newCameraName, setNewCameraName] = useState('');
+  const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Mock data for demonstration
   useEffect(() => {
@@ -81,6 +84,14 @@ export function MonitorDashboard() {
 
   const removeCamera = (cameraId: string) => {
     setCameras(cameras.filter(cam => cam.id !== cameraId));
+  };
+
+  const togglePause = () => {
+    setIsPaused(!isPaused);
+  };
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
   };
 
   const getStatusColor = (status: CameraDevice['status']) => {
@@ -179,14 +190,63 @@ export function MonitorDashboard() {
       </div>
 
       {/* Cameras Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {cameras.map((camera) => (
           <div
             key={camera.id}
-            className={`rounded-xl p-6 border ${
+            className={`rounded-xl overflow-hidden ${
               darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
             }`}
           >
+            {/* Live Video Feed */}
+            <div className="relative bg-black aspect-video">
+              {camera.status === 'online' ? (
+                <>
+                  <video
+                    className="w-full h-full object-cover"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                  />
+                  {/* Video Controls */}
+                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={togglePause}
+                          className="bg-black/50 hover:bg-black/70 text-white p-2 rounded-lg transition-colors"
+                          title={isPaused ? "Resume" : "Pause"}
+                        >
+                          {isPaused ? <Play size={16} /> : <Pause size={16} />}
+                        </button>
+                        <button
+                          onClick={toggleFullscreen}
+                          className="bg-black/50 hover:bg-black/70 text-white p-2 rounded-lg transition-colors"
+                          title="Toggle Fullscreen"
+                        >
+                          <Maximize2 size={16} />
+                        </button>
+                      </div>
+                      <div className={`px-2 py-1 rounded-full text-xs ${
+                        camera.status === 'online' ? 'bg-green-500' :
+                        camera.status === 'offline' ? 'bg-gray-500' :
+                        'bg-red-500'
+                      }`}>
+                        {camera.status}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <CameraOff size={48} className={darkMode ? 'text-gray-600' : 'text-gray-400'} />
+                  <p className={`ml-3 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Camera Offline
+                  </p>
+                </div>
+              )}
+            </div>
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>

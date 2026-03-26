@@ -52,3 +52,8 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Video aspect ratio */
+.aspect-video {
+  aspect-ratio: 16/9;
+}
