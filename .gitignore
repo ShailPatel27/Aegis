@@ -146,10 +146,11 @@ docs/generated/
 .parcel-cache/
 
 # Python virtual environments
-*/venv
 venv/
 env/
 .env/
+*/venv
+**/venv/
 
 # Build artifacts
 *.tgz

@@ -527,13 +527,13 @@ export function AddCamera() {
           )}
 
           {/* Video Preview */}
-          <div className={`rounded-lg overflow-hidden bg-black relative group ${darkMode ? 'border border-gray-700' : ''}`}>
+          <div className={`rounded-lg overflow-hidden bg-gray-900 relative group ${darkMode ? 'border border-gray-700' : ''}`}>
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="w-full h-64 object-contain"
+              className="w-full h-auto object-contain"
             />
             {!isWebcamActive && (
               <div className="flex items-center justify-center h-64 bg-gray-900">
