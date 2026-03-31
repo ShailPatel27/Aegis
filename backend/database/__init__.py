@@ -1,7 +1,7 @@
 """
-Database Module
+Database package
 """
 
-from .models import db
+from .supabase import supabase
 
-__all__ = ["db"]
+__all__ = ["supabase"]

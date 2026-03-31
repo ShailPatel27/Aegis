@@ -8,7 +8,6 @@ class User(BaseModel):
     """User model"""
     email: str
     name: str
-    user_type: str = "monitor"
     phone: Optional[str] = None
     recovery_email: Optional[str] = None
     alternate_contact: Optional[str] = None
@@ -21,7 +20,6 @@ class UserCreate(BaseModel):
     email: EmailStr
     name: str
     password: str
-    user_type: str = "monitor"
     phone: Optional[str] = None
     recovery_email: Optional[str] = None
     alternate_contact: Optional[str] = None

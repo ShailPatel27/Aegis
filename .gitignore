@@ -142,6 +142,8 @@ user-files/
 docs/generated/
 
 # Cache directories
+__pycache__/
+*.pyc
 .cache/
 .parcel-cache/
 
