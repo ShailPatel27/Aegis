@@ -37,13 +37,8 @@ def get_available_port() -> int:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    db.load_all_data()
     print("🚀 AEGIS Backend Started Successfully")
-    print(f"📊 Database loaded: {len(db.users_db)} users, {len(db.verification_codes_db)} codes, {len(db.profiles_db)} profiles")
     yield
-    # Shutdown
-    db.save_all_data()
     print("🛑 AEGIS Backend Shutting Down")
 
 # FastAPI App
