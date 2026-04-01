@@ -19,9 +19,10 @@ class Settings:
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+    API_URL: str = os.getenv("API_URL", "http://localhost:8000")
 
     APP_NAME: str = os.getenv("APP_NAME", "AEGIS Vision System")
-    VERSION: str = os.getenv("VERSION", "0.1.0")
+    VERSION: str = os.getenv("VERSION", "1.0.0")
 
     # =========================
     # Security Configuration

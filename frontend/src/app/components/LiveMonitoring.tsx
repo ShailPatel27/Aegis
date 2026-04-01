@@ -304,35 +304,36 @@ export function LiveMonitoring() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Event Feed */}
-      <div className="lg:col-span-1">
-        <div className={`rounded-xl shadow-sm p-6 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
-          <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-            <Camera size={20} />
-            Real-Time Events
-          </h2>
-          <div className="space-y-3 max-h-[600px] overflow-y-auto">
-            {mockEvents.map((event) => (
-              <div key={event.id} className={`p-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
-                }`}>
-                <div className="flex gap-3">
-                  <img
-                    src={event.img}
-                    alt={event.type}
-                    className="w-16 h-16 rounded object-cover"
-                  />
-                  <div className="flex-1">
-                    <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{event.type}</p>
-                    <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Confidence: {event.confidence}</p>
-                    <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{event.time}</p>
+
+          {/* Event Feed */}
+          <div className="lg:col-span-1 lg:sticky lg:top-6">
+            <div className={`rounded-xl shadow-sm p-6 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+              }`}>
+              <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                <Camera size={20} />
+                Real-Time Events
+              </h2>
+              <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                {mockEvents.map((event) => (
+                  <div key={event.id} className={`p-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+                    }`}>
+                    <div className="flex gap-3">
+                      <img
+                        src={event.img}
+                        alt={event.type}
+                        className="w-16 h-16 rounded object-cover"
+                      />
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{event.type}</p>
+                        <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Confidence: {event.confidence}</p>
+                        <p className={`text-xs mt-1 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>{event.time}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </div>

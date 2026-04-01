@@ -10,7 +10,9 @@ import socket
 
 from config.settings import settings
 from auth.routes import router as auth_router
-from camera.stream import router as camera_router
+from camera.stream import router as camera_stream_router
+from camera.routes import router as camera_router
+from camera.status import start_status_monitor
 
 def is_port_available(port: int) -> bool:
     """Check if port is available"""
@@ -40,18 +42,21 @@ def get_available_port() -> int:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("🚀 AEGIS Backend Started Successfully")
+
+    start_status_monitor()
+
     yield
+
     print("🛑 AEGIS Backend Shutting Down")
 
 
 # FastAPI App
 app = FastAPI(
-    title="AEGIS Vision System API",
+    title=settings.APP_NAME,
     description="Modular Security & AI Application",
-    version="0.1.0",
+    version=settings.VERSION,
     lifespan=lifespan
 )
-
 
 # CORS Middleware
 app.add_middleware(
@@ -65,7 +70,8 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router, prefix="/api/v1")
-app.include_router(camera_router, prefix="/api/camera")
+app.include_router(camera_stream_router, prefix="/api/camera")
+app.include_router(camera_router, prefix="/api/cameras")
 
 
 # Health check endpoint

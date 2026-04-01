@@ -164,3 +164,6 @@ query
 
 # Guidelines
 guidelines/
+
+# Device ID
+device_id.txt
