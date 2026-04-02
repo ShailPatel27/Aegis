@@ -17,7 +17,7 @@ export function LoginSignup() {
       navigate("/select-type");
     }
   }, [user, navigate]);
-  const { login, register, isLoading, error } = useUser();
+  const { login, register, isLoading, error, setError } = useUser();
   const [isSignup, setIsSignup] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
@@ -34,10 +34,32 @@ export function LoginSignup() {
   });
   const [formError, setFormError] = useState("");
 
+  // Clear errors when user starts typing in form fields
+  useEffect(() => {
+    const handleFormInput = (event: Event) => {
+      if (error || formError) {
+        setFormError("");
+        setError(null);
+      }
+    };
+
+    const inputs = document.querySelectorAll('input');
+    inputs.forEach(input => {
+      input.addEventListener('input', handleFormInput);
+    });
+
+    return () => {
+      inputs.forEach(input => {
+        input.removeEventListener('input', handleFormInput);
+      });
+    };
+  }, [error, formError, setError]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
-
+    setError(null);
+    
     if (isSignup && formData.password !== formData.confirmPassword) {
       setFormError("Passwords do not match!");
       return;
@@ -129,7 +151,7 @@ export function LoginSignup() {
               <AlertCircle size={20} className="text-red-400 flex-shrink-0" />
               <div className="text-red-300 text-sm">
                 <p className="font-medium">Error</p>
-                <p>{typeof error === 'object' ? JSON.stringify(error) : error || formError}</p>
+                <p>{formError || (error && typeof error === 'object' ? JSON.stringify(error) : error)}</p>
               </div>
             </div>
           )}

@@ -31,65 +31,82 @@ class AuthService:
     def register_user(self, user_data: UserCreate) -> Dict[str, Any]:
         """Register a new user"""
 
-        # Validate email
-        if not validate_email(user_data.email):
-            return APIResponse(
-                message="Invalid email format",
-                success=False,
-                error="INVALID_EMAIL_FORMAT"
-            ).dict()
+        try:
+            print("1. register_user started")
 
-        # Check if user exists
-        existing = supabase.table("users") \
-            .select("id") \
-            .eq("email", user_data.email.lower()) \
-            .execute()
+            # Validate email
+            print("2. validating email")
+            if not validate_email(user_data.email):
+                print("invalid email")
+                return APIResponse(
+                    message="Invalid email format",
+                    success=False,
+                    error="INVALID_EMAIL_FORMAT"
+                ).dict()
 
-        if existing.data:
-            return APIResponse(
-                message="Email already registered",
-                success=False,
-                error="EMAIL_EXISTS"
-            ).dict()
+            print("3. checking existing user")
+            existing = supabase.table("users") \
+                .select("id") \
+                .eq("email", user_data.email.lower()) \
+                .execute()
 
-        # Hash password
-        hashed_password = hash_password(user_data.password)
+            print("existing:", existing.data)
 
-        user_dict = {
-            "email": user_data.email.lower(),
-            "name": user_data.name,
-            "hashed_password": hashed_password,
-            "created_at": datetime.utcnow().isoformat(),
-            "phone": user_data.phone,
-            "recovery_email": user_data.recovery_email,
-            "alternate_contact": user_data.alternate_contact,
-            "email_verified": True,
-            "phone_verified": False
-        }
+            if existing.data:
+                print("user already exists")
+                return APIResponse(
+                    message="Email already registered",
+                    success=False,
+                    error="EMAIL_EXISTS"
+                ).dict()
 
-        # Insert user
-        response = supabase.table("users").insert(user_dict).execute()
-        user = response.data[0]
+            print("4. hashing password")
+            hashed_password = hash_password(user_data.password)
 
-        # Create JWT token
-        token = generate_access_token({
-            "user_id": user["id"],
-            "email": user_data.email
-        })
-
-        return APIResponse(
-            message="User registered successfully",
-            success=True,
-            data={
-                "access_token": token,
-                "token_type": "bearer",
-                "user": {
-                    "id": user_id,
-                    "email": user_data.email,
-                    "name": user_data.name,
-                }
+            user_dict = {
+                "email": user_data.email.lower(),
+                "name": user_data.name,
+                "hashed_password": hashed_password,
+                "created_at": datetime.utcnow().isoformat(),
+                "phone": user_data.phone,
+                "recovery_email": user_data.recovery_email,
+                "alternate_contact": user_data.alternate_contact,
+                "email_verified": True,
+                "phone_verified": False
             }
-        ).dict()
+
+            print("5. inserting user")
+            response = supabase.table("users").insert(user_dict).execute()
+
+            print("6. insert response:", response)
+
+            user = response.data[0]
+
+            print("7. generating token")
+            token = generate_access_token({
+                "user_id": user["id"],
+                "email": user_data.email
+            })
+
+            print("8. returning response")
+
+            return APIResponse(
+                message="User registered successfully",
+                success=True,
+                data={
+                    "access_token": token,
+                    "token_type": "bearer",
+                    "user": {
+                        "id": user["id"],
+                        "email": user_data.email,
+                        "name": user_data.name,
+                    }
+                }
+            ).dict()
+
+        except Exception as e:
+            print("REGISTER ERROR:", e)
+            raise e
 
     def login_user(self, login_data: UserLogin) -> Dict[str, Any]:
         """Login user"""

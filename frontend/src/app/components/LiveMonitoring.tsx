@@ -1,14 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Camera, Circle, Grid3x3, Monitor, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
+import { cameraAPI, tokenManager, BACKEND_BASE_URL } from "../services/api";
 
-const cameras = [
-  { id: 1, name: "Main Entrance", location: "Front Door", img: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&q=80" },
-  { id: 2, name: "Parking Lot", location: "Exterior", img: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=1200&q=80" },
-  { id: 3, name: "Reception Area", location: "Lobby", img: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=1200&q=80" },
-  { id: 4, name: "Hallway A", location: "Floor 1", img: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1200&q=80" },
-  { id: 5, name: "Server Room", location: "Floor 2", img: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&q=80" },
-];
+
 
 const mockEvents = [
   { id: 1, type: "Person", confidence: "98%", time: "14:32:45", img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&q=80" },
@@ -21,13 +16,37 @@ type LayoutType = "single" | "main-with-grid" | "grid";
 
 export function LiveMonitoring() {
   const { darkMode } = useSharedDarkMode();
-  const [selectedCamera, setSelectedCamera] = useState(cameras[0]);
+  const [cameras, setCameras] = useState<any[]>([]);
+  const [selectedCamera, setSelectedCamera] = useState<any | null>(null);
   const [objectDetection, setObjectDetection] = useState(true);
   const [faceRecognition, setFaceRecognition] = useState(true);
   const [weaponDetection, setWeaponDetection] = useState(true);
   const [screenshot, setScreenshot] = useState(false);
   const [layout, setLayout] = useState<LayoutType>("main-with-grid");
   const [mainCameraIndex, setMainCameraIndex] = useState(0);
+
+  useEffect(() => {
+    const loadCameras = async () => {
+      try {
+        const token = tokenManager.getToken();
+        if (!token) return;
+
+        const response = await cameraAPI.getCameras(token);
+
+        setCameras(response.cameras || []);
+
+        if (response.cameras && response.cameras.length > 0) {
+          setSelectedCamera(response.cameras[0]);
+          setMainCameraIndex(0);
+        }
+
+      } catch (error) {
+        console.error("Failed to load cameras:", error);
+      }
+    };
+
+    loadCameras();
+  }, []);
 
   const goToPrevCamera = () => {
     setMainCameraIndex((prev) => (prev === 0 ? cameras.length - 1 : prev - 1));
@@ -39,54 +58,69 @@ export function LiveMonitoring() {
     setSelectedCamera(cameras[mainCameraIndex === cameras.length - 1 ? 0 : mainCameraIndex + 1]);
   };
 
-  const renderVideoFeed = (camera: typeof cameras[0], isMain: boolean = false) => (
-    <div className="relative bg-gray-900 rounded-lg overflow-hidden aspect-video">
-      <img
-        src={camera.img}
-        alt={camera.name}
-        className="w-full h-full object-cover opacity-70"
-      />
+  const renderVideoFeed = (camera: typeof cameras[0], isMain: boolean = false) => {
 
-      {/* Live Indicator */}
-      <div className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-        <Circle className="w-1.5 h-1.5 fill-white animate-pulse" />
-        LIVE
-      </div>
-
-      {/* Camera Info */}
-      <div className="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
-        {camera.name}
-      </div>
-
-      {/* Timestamp */}
-      <div className="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-mono">
-        {new Date().toLocaleTimeString()}
-      </div>
-
-      {/* Detection Boxes (only on main view) */}
-      {isMain && objectDetection && (
-        <>
-          <div className="absolute top-1/3 left-1/4 w-32 h-40 border-2 border-green-400 rounded">
-            <div className="absolute -top-7 left-0 bg-green-400 text-white text-xs px-2 py-1 rounded">
-              Person #001 • 98%
-            </div>
+    if (!camera) {
+      return (
+        <div className="flex items-center justify-center aspect-video bg-gray-900 rounded-lg">
+          <div className="text-center text-gray-400">
+            <Camera className="mx-auto mb-2 opacity-50" size={36} />
+            <p>No cameras available</p>
+            <p className="text-xs mt-1">Add a camera to start monitoring</p>
           </div>
-          <div className="absolute bottom-1/4 right-1/3 w-28 h-36 border-2 border-blue-400 rounded">
-            <div className="absolute -top-7 left-0 bg-blue-400 text-white text-xs px-2 py-1 rounded">
-              Person #002 • 95%
-            </div>
-          </div>
-          {faceRecognition && (
-            <div className="absolute top-1/2 left-1/2 w-20 h-24 border-2 border-yellow-400 rounded">
-              <div className="absolute -top-7 left-0 bg-yellow-400 text-gray-900 text-xs px-2 py-1 rounded whitespace-nowrap">
-                John Doe • Whitelist
+        </div>
+      );
+    }
+
+    return (
+      <div className="relative bg-gray-900 rounded-lg overflow-hidden aspect-video">
+        <img
+          src={`${BACKEND_BASE_URL}/api/camera/stream/${camera?.id}`}
+          alt={camera.name}
+          className="w-full h-full object-cover opacity-70"
+        />
+
+        {/* Live Indicator */}
+        <div className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+          <Circle className="w-1.5 h-1.5 fill-white animate-pulse" />
+          LIVE
+        </div>
+
+        {/* Camera Info */}
+        <div className="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
+          {camera.name}
+        </div>
+
+        {/* Timestamp */}
+        <div className="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-mono">
+          {new Date().toLocaleTimeString()}
+        </div>
+
+        {/* Detection Boxes (only on main view) */}
+        {isMain && objectDetection && (
+          <>
+            <div className="absolute top-1/3 left-1/4 w-32 h-40 border-2 border-green-400 rounded">
+              <div className="absolute -top-7 left-0 bg-green-400 text-white text-xs px-2 py-1 rounded">
+                Person #001 • 98%
               </div>
             </div>
-          )}
-        </>
-      )}
-    </div>
-  );
+            <div className="absolute bottom-1/4 right-1/3 w-28 h-36 border-2 border-blue-400 rounded">
+              <div className="absolute -top-7 left-0 bg-blue-400 text-white text-xs px-2 py-1 rounded">
+                Person #002 • 95%
+              </div>
+            </div>
+            {faceRecognition && (
+              <div className="absolute top-1/2 left-1/2 w-20 h-24 border-2 border-yellow-400 rounded">
+                <div className="absolute -top-7 left-0 bg-yellow-400 text-gray-900 text-xs px-2 py-1 rounded whitespace-nowrap">
+                  John Doe • Whitelist
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -169,7 +203,7 @@ export function LiveMonitoring() {
                   <select
                     className={`w-full md:w-96 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
                       }`}
-                    value={selectedCamera.id}
+                    value={selectedCamera?.id || ""}
                     onChange={(e) => {
                       const camera = cameras.find(c => c.id === parseInt(e.target.value));
                       if (camera) {
@@ -190,7 +224,7 @@ export function LiveMonitoring() {
 
                 {/* Thumbnail Grid */}
                 <div className="mt-4 grid grid-cols-4 gap-3">
-                  {cameras.filter(c => c.id !== selectedCamera.id).map((camera) => (
+                  {cameras.filter(c => c.id !== selectedCamera?.id).map((camera) => (
                     <button
                       key={camera.id}
                       onClick={() => {
@@ -226,7 +260,7 @@ export function LiveMonitoring() {
                       setMainCameraIndex(cameras.indexOf(camera));
                       setLayout("main-with-grid");
                     }}
-                    className={`rounded-lg overflow-hidden border-2 transition-colors ${selectedCamera.id === camera.id
+                    className={`rounded-lg overflow-hidden border-2 transition-colors ${selectedCamera?.id === camera.id
                       ? "border-blue-500"
                       : darkMode ? "border-gray-600 hover:border-blue-400" : "border-gray-200 hover:border-blue-300"
                       }`}

@@ -6,8 +6,6 @@ interface User {
   name: string;
   email: string;
   id: string;
-  type?: string;
-  user_type?: 'camera' | 'monitor';
   phone?: string;
   recovery_email?: string;
   alternate_contact?: string;
@@ -26,43 +24,49 @@ interface UserContextType {
   logout: () => void;
   isLoading: boolean;
   error: string | null;
+  setError: (error: string | null) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
+
   const [user, setUser] = useState<User | null>(() => {
-    // Load user from localStorage on mount
     const savedUser = localStorage.getItem("aegis_user");
     return savedUser ? JSON.parse(savedUser) : null;
   });
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+
   useEffect(() => {
-    // Check for existing token and validate user
     const token = tokenManager.getToken();
     if (token && !user) {
       validateToken(token);
     }
   }, []);
 
+
   const validateToken = async (token: string) => {
     try {
       setIsLoading(true);
+
       const userData = await authAPI.getCurrentUser(token);
+
       const userObj: User = {
         id: userData.id,
         email: userData.email,
         name: userData.name,
-        user_type: userData.user_type,
         cameraId: userData.camera_id,
         phone: userData.phone,
         recovery_email: userData.recovery_email,
         alternate_contact: userData.alternate_contact,
       };
+
       setUser(userObj);
       localStorage.setItem("aegis_user", JSON.stringify(userObj));
+
     } catch (error) {
       console.error("Token validation failed:", error);
       tokenManager.removeToken();
@@ -72,72 +76,91 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   };
 
+
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const response = await authAPI.login({ email, password });
       tokenManager.setToken(response.access_token);
-      
-      // Get user info
+
       const userData = await authAPI.getCurrentUser(response.access_token);
+
       const userObj: User = {
         id: userData.id,
         email: userData.email,
         name: userData.name,
-        user_type: userData.user_type,
         cameraId: userData.camera_id,
         phone: userData.phone,
         recovery_email: userData.recovery_email,
         alternate_contact: userData.alternate_contact,
       };
-      
+
       setUser(userObj);
       localStorage.setItem("aegis_user", JSON.stringify(userObj));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Login failed");
-      throw error;
+
+    } catch (error: any) {
+      console.error("Login error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Login failed"
+      );
+
     } finally {
       setIsLoading(false);
     }
   };
 
+
   const register = async (userData: {
     name: string;
     email: string;
     password: string;
-    user_type: 'camera' | 'monitor';
   }) => {
+
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const response = await authAPI.register(userData);
       tokenManager.setToken(response.access_token);
-      
-      // Get user info
+
       const userInfo = await authAPI.getCurrentUser(response.access_token);
+
       const userObj: User = {
         id: userInfo.id,
         email: userInfo.email,
         name: userInfo.name,
-        type: userInfo.user_type,
         cameraId: userInfo.camera_id,
         phone: userInfo.phone,
         recovery_email: userInfo.recovery_email,
         alternate_contact: userInfo.alternate_contact,
       };
-      
+
       setUser(userObj);
       localStorage.setItem("aegis_user", JSON.stringify(userObj));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Registration failed");
+
+    } catch (error: any) {
+
+      console.error("Register error:", error);
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Registration failed"
+      );
+
+      // Re-throw the error so the form can handle it
       throw error;
+
     } finally {
       setIsLoading(false);
     }
   };
+
 
   const logout = () => {
     setUser(null);
@@ -145,17 +168,32 @@ export function UserProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("aegis_user");
   };
 
+
   return (
-    <UserContext.Provider value={{ user, setUser, logout, login, register, isLoading, error }}>
+    <UserContext.Provider
+      value={{
+        user,
+        setUser,
+        logout,
+        login,
+        register,
+        isLoading,
+        error,
+        setError
+      }}
+    >
       {children}
     </UserContext.Provider>
   );
 }
 
+
 export function useUser() {
   const context = useContext(UserContext);
+
   if (context === undefined) {
     throw new Error("useUser must be used within a UserProvider");
   }
+
   return context;
 }

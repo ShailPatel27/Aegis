@@ -24,13 +24,29 @@ security = HTTPBearer()
 @router.post("/register")
 async def register(user_data: UserCreate):
     """Register a new user"""
-    return auth_service.register_user(user_data)
+    result = auth_service.register_user(user_data)
+    
+    if not result.get("success", False):
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("message", "Registration failed")
+        )
+    
+    return result
 
 
 @router.post("/login")
 async def login(login_data: UserLogin):
     """Login user"""
-    return auth_service.login_user(login_data)
+    result = auth_service.login_user(login_data)
+    
+    if not result.get("success", False):
+        raise HTTPException(
+            status_code=401,
+            detail=result.get("message", "Login failed")
+        )
+    
+    return result
 
 
 @router.post("/forgot-password")
