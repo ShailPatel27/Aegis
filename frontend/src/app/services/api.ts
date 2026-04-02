@@ -1,9 +1,10 @@
-const API_BASE_URL = 'http://localhost:8000/api/v1';
-const CAMERA_API_URL = 'http://localhost:8000/api/cameras';
 export const BACKEND_BASE_URL =
   import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
-fetch(`${CAMERA_API_URL}`)
+const API_BASE_URL = `${BACKEND_BASE_URL}/api/v1`;
+const CAMERA_API_URL = `${BACKEND_BASE_URL}/api/cameras`;
+
+// fetch(`${CAMERA_API_URL}`)
 
 // User authentication API calls
 export const authAPI = {
