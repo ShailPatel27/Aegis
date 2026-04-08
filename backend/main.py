@@ -13,6 +13,7 @@ from auth.routes import router as auth_router
 from camera.stream import router as camera_stream_router
 from camera.routes import router as camera_router
 from camera.status import start_status_monitor
+from fastapi.responses import HTMLResponse
 
 def is_port_available(port: int) -> bool:
     """Check if port is available"""
@@ -74,6 +75,18 @@ app.include_router(camera_stream_router, prefix="/api/camera")
 app.include_router(camera_router, prefix="/api/cameras")
 
 
+@app.get("/test")
+def test():
+    return HTMLResponse("""
+    <html>
+    <body>
+    <h1>Camera Test</h1>
+    <img src="/api/camera/stream/0" width="640">
+    </body>
+    </html>
+    """)
+
+    
 # Health check endpoint
 @app.get("/health")
 async def health_check():

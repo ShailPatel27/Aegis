@@ -167,3 +167,7 @@ guidelines/
 
 # Device ID
 device_id.txt
+
+# Models
+*.pt
+models/

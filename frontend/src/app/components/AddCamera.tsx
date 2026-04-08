@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Check, ShoppingBag, Building, GraduationCap, Star, Camera, Play, Square, Maximize2 } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
+import { cameraAPI, tokenManager } from "../services/api";
 
 const predefinedTemplates = [
   {
@@ -74,18 +75,18 @@ export function AddCamera() {
   const [showNameModal, setShowNameModal] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<CameraConfig | null>(null);
   const [cameraName, setCameraName] = useState("");
-  
+
   // Camera source states - simplified for camera users (webcam only)
   const [isWebcamActive, setIsWebcamActive] = useState(false);
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
   const [selectedCamera, setSelectedCamera] = useState<string>('');
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
-  
+
   // Refs for video stream
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  
+
   const [customConfig, setCustomConfig] = useState<CameraConfig>({
     objectDetection: true,
     weaponDetection: true,
@@ -94,7 +95,7 @@ export function AddCamera() {
     loiteringDetection: false,
     crowdDetection: false,
   });
-  
+
   // Mock saved configurations
   const [savedConfigs, setSavedConfigs] = useState<SavedConfig[]>([
     {
@@ -170,12 +171,12 @@ export function AddCamera() {
         console.log('Getting available cameras...');
         const devices = await navigator.mediaDevices.enumerateDevices();
         console.log('All devices:', devices);
-        
+
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
         console.log('Video devices:', videoDevices);
-        
+
         setAvailableCameras(videoDevices);
-        
+
         if (videoDevices.length > 0 && !selectedCamera) {
           const firstCamera = videoDevices[0].deviceId;
           console.log('Auto-selecting first camera:', firstCamera);
@@ -196,20 +197,20 @@ export function AddCamera() {
   const requestCameraPermission = async () => {
     try {
       console.log('Requesting camera permission...');
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: false 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
       });
       console.log('Permission granted, got stream:', stream);
-      
+
       // Stop the stream immediately, we just wanted permission
       stream.getTracks().forEach(track => track.stop());
-      
+
       // Refresh camera list
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
       setAvailableCameras(videoDevices);
-      
+
       if (videoDevices.length > 0) {
         setSelectedCamera(videoDevices[0].deviceId);
         setConnectionStatus('idle');
@@ -233,16 +234,16 @@ export function AddCamera() {
     console.log('Starting webcam...');
     console.log('Selected camera:', selectedCamera);
     console.log('Video ref available:', !!videoRef.current);
-    
+
     if (!videoRef.current) {
       console.error('Video ref missing');
       setConnectionStatus('error');
       return;
     }
-    
+
     try {
       setConnectionStatus('connecting');
-      
+
       // Try with selected camera first, then fallback to any camera
       let constraints: MediaStreamConstraints = {
         video: {
@@ -251,7 +252,7 @@ export function AddCamera() {
         } as MediaTrackConstraints,
         audio: false
       };
-      
+
       if (selectedCamera) {
         constraints.video = {
           deviceId: { exact: selectedCamera },
@@ -259,16 +260,16 @@ export function AddCamera() {
           height: { ideal: 720 }
         } as MediaTrackConstraints;
       }
-      
+
       console.log('Requesting media with constraints:', constraints);
-      
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         console.log('Got stream with selected camera:', stream);
         await setupStream(stream);
       } catch (specificError) {
         console.log('Failed with specific camera, trying any camera:', specificError);
-        
+
         // Fallback to any camera
         const fallbackConstraints: MediaStreamConstraints = {
           video: {
@@ -277,18 +278,18 @@ export function AddCamera() {
           } as MediaTrackConstraints,
           audio: false
         };
-        
+
         console.log('Requesting media with fallback constraints:', fallbackConstraints);
         const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
         console.log('Got stream with fallback:', stream);
         await setupStream(stream);
       }
-      
+
     } catch (error) {
       console.error('Error accessing webcam:', error);
       setConnectionStatus('error');
       setIsWebcamActive(false);
-      
+
       // Show user-friendly error
       if (error instanceof Error) {
         if (error.name === 'NotAllowedError') {
@@ -307,14 +308,14 @@ export function AddCamera() {
   const setupStream = async (stream: MediaStream) => {
     streamRef.current = stream;
     videoRef.current!.srcObject = stream;
-    
+
     videoRef.current!.onloadedmetadata = () => {
       console.log('Video metadata loaded, playing...');
       videoRef.current?.play();
       setConnectionStatus('connected');
       setIsWebcamActive(true);
     };
-    
+
     videoRef.current!.onerror = (error) => {
       console.error('Video error:', error);
       setConnectionStatus('error');
@@ -336,7 +337,7 @@ export function AddCamera() {
 
   const toggleFullscreen = () => {
     if (!videoRef.current) return;
-    
+
     if (!isFullscreen) {
       if (videoRef.current.requestFullscreen) {
         videoRef.current.requestFullscreen();
@@ -373,20 +374,47 @@ export function AddCamera() {
     setCameraName("");
   };
 
-  const saveCamera = () => {
-    if (cameraName.trim() && selectedConfig) {
-      // Here you would save the camera with the selected configuration
-      console.log("Saving camera:", cameraName, selectedConfig);
+  const saveCamera = async () => {
+    if (!cameraName.trim() || !selectedConfig) return;
+
+    try {
+      const token = tokenManager.getToken();
+      if (!token) throw new Error("Not authenticated");
+
+      await cameraAPI.registerCamera(token, {
+        name: cameraName,
+        selected_camera: availableCameras.findIndex(c => c.deviceId === selectedCamera),
+        type: "webcam",
+      });
+
       setShowNameModal(false);
       setSelectedConfig(null);
       setCameraName("");
+      alert("Camera saved successfully!");
+    } catch (error) {
+      console.error("Failed to save camera:", error);
+      alert("Failed to save camera. Please try again.");
     }
   };
 
-  const addCustomCamera = () => {
-    if (cameraName.trim()) {
-      console.log("Adding custom camera:", cameraName, customConfig);
+  const addCustomCamera = async () => {
+    if (!cameraName.trim()) return;
+
+    try {
+      const token = tokenManager.getToken();
+      if (!token) throw new Error("Not authenticated");
+
+      await cameraAPI.registerCamera(token, {
+        name: cameraName,
+        selected_camera: availableCameras.findIndex(c => c.deviceId === selectedCamera),
+        type: "webcam",
+      });
+
       setCameraName("");
+      alert("Camera added successfully!");
+    } catch (error) {
+      console.error("Failed to add camera:", error);
+      alert("Failed to add camera. Please try again.");
     }
   };
 
@@ -398,8 +426,8 @@ export function AddCamera() {
   };
 
   const toggleFavorite = (configId: number) => {
-    setSavedConfigs(savedConfigs.map(config => 
-      config.id === configId 
+    setSavedConfigs(savedConfigs.map(config =>
+      config.id === configId
         ? { ...config, isFavorite: !config.isFavorite }
         : config
     ));
@@ -438,9 +466,8 @@ export function AddCamera() {
       </div>
 
       {/* Camera Setup - Webcam Only for Camera Users */}
-      <div className={`rounded-xl shadow-sm p-6 border mb-8 ${
-        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-      }`}>
+      <div className={`rounded-xl shadow-sm p-6 border mb-8 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
         <div className="mb-6">
           <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera Setup</h2>
           <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Configure your webcam for detection monitoring</p>
@@ -455,9 +482,8 @@ export function AddCamera() {
               <select
                 value={selectedCamera}
                 onChange={(e) => switchCamera(e.target.value)}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
-                }`}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                  }`}
               >
                 {availableCameras.map((camera) => (
                   <option key={camera.deviceId} value={camera.deviceId}>
@@ -467,9 +493,8 @@ export function AddCamera() {
               </select>
             </div>
           ) : (
-            <div className={`p-4 rounded-lg border-2 ${
-              darkMode ? 'bg-yellow-900 border-yellow-700' : 'bg-yellow-50 border-yellow-200'
-            }`}>
+            <div className={`p-4 rounded-lg border-2 ${darkMode ? 'bg-yellow-900 border-yellow-700' : 'bg-yellow-50 border-yellow-200'
+              }`}>
               <div className="flex items-center gap-3 mb-3">
                 <Camera className={`w-6 h-6 ${darkMode ? 'text-yellow-400' : 'text-yellow-600'}`} />
                 <h3 className={`font-medium ${darkMode ? 'text-yellow-100' : 'text-yellow-800'}`}>
@@ -481,11 +506,10 @@ export function AddCamera() {
               </p>
               <button
                 onClick={requestCameraPermission}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  darkMode 
-                    ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
-                    : 'bg-yellow-600 text-white hover:bg-yellow-700'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${darkMode
+                  ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                  : 'bg-yellow-600 text-white hover:bg-yellow-700'
+                  }`}
               >
                 Request Camera Permission
               </button>
@@ -496,32 +520,29 @@ export function AddCamera() {
             <div className="flex items-center gap-4">
               <button
                 onClick={isWebcamActive ? stopWebcam : startWebcam}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  isWebcamActive
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-green-600 text-white hover:bg-green-700'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${isWebcamActive
+                  ? 'bg-red-600 text-white hover:bg-red-700'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
               >
                 {isWebcamActive ? <Square size={16} /> : <Play size={16} />}
                 {isWebcamActive ? 'Stop Camera' : 'Start Camera'}
               </button>
 
-              <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-                connectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${connectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
                 connectionStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
-                connectionStatus === 'error' ? 'bg-red-100 text-red-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
-                <div className={`w-2 h-2 rounded-full ${
-                  connectionStatus === 'connected' ? 'bg-green-500' :
+                  connectionStatus === 'error' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
+                }`}>
+                <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' :
                   connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
-                  connectionStatus === 'error' ? 'bg-red-500' :
-                  'bg-gray-400'
-                }`} />
+                    connectionStatus === 'error' ? 'bg-red-500' :
+                      'bg-gray-400'
+                  }`} />
                 {connectionStatus === 'connected' ? 'Connected' :
-                 connectionStatus === 'connecting' ? 'Connecting...' :
-                 connectionStatus === 'error' ? 'Error' :
-                 'Idle'}
+                  connectionStatus === 'connecting' ? 'Connecting...' :
+                    connectionStatus === 'error' ? 'Error' :
+                      'Idle'}
               </div>
             </div>
           )}
@@ -561,11 +582,10 @@ export function AddCamera() {
           {predefinedTemplates.map((template) => {
             const Icon = template.icon;
             return (
-              <div 
+              <div
                 key={template.id}
-                className={`rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-shadow ${
-                  darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-                }`}
+                className={`rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-shadow ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                  }`}
               >
                 <div className={`${template.color} p-6 text-white`}>
                   <div className="flex items-center justify-between mb-3">
@@ -574,42 +594,42 @@ export function AddCamera() {
                   <h3 className="text-2xl font-bold mb-2">{template.name}</h3>
                   <p className="text-sm opacity-90">{template.description}</p>
                 </div>
-                
+
                 <div className="p-6">
                   <div className="space-y-2 mb-6">
-                    <FeatureItem 
-                      enabled={template.features.objectDetection} 
-                      label="Object Detection" 
+                    <FeatureItem
+                      enabled={template.features.objectDetection}
+                      label="Object Detection"
                       darkMode={darkMode}
                     />
-                    <FeatureItem 
-                      enabled={template.features.weaponDetection} 
-                      label="Weapon Detection" 
+                    <FeatureItem
+                      enabled={template.features.weaponDetection}
+                      label="Weapon Detection"
                       darkMode={darkMode}
                     />
-                    <FeatureItem 
-                      enabled={template.features.faceRecognition} 
-                      label="Face Recognition" 
+                    <FeatureItem
+                      enabled={template.features.faceRecognition}
+                      label="Face Recognition"
                       darkMode={darkMode}
                     />
-                    <FeatureItem 
-                      enabled={template.features.runningDetection} 
-                      label="Running Detection" 
+                    <FeatureItem
+                      enabled={template.features.runningDetection}
+                      label="Running Detection"
                       darkMode={darkMode}
                     />
-                    <FeatureItem 
-                      enabled={template.features.loiteringDetection} 
-                      label="Loitering Detection" 
+                    <FeatureItem
+                      enabled={template.features.loiteringDetection}
+                      label="Loitering Detection"
                       darkMode={darkMode}
                     />
-                    <FeatureItem 
-                      enabled={template.features.crowdDetection} 
-                      label="Crowd Detection" 
+                    <FeatureItem
+                      enabled={template.features.crowdDetection}
+                      label="Crowd Detection"
                       darkMode={darkMode}
                     />
                   </div>
-                  
-                  <button 
+
+                  <button
                     onClick={() => applyPreset(template.features)}
                     className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
                   >
@@ -633,12 +653,11 @@ export function AddCamera() {
               {sortedConfigs.map((savedConfig) => {
                 const colorClass = getConfigColor(savedConfig.config);
                 return (
-                  <div 
+                  <div
                     key={savedConfig.id}
-                    className={`rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-shadow relative flex-shrink-0 ${
-                      darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-                    }`}
-                    style={{ 
+                    className={`rounded-xl shadow-sm border-2 overflow-hidden hover:shadow-md transition-shadow relative flex-shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                      }`}
+                    style={{
                       width: 'clamp(280px, 25vw, 350px)', // Responsive width: min 280px, max 350px
                       minWidth: '280px',
                       maxWidth: '350px'
@@ -650,54 +669,54 @@ export function AddCamera() {
                         className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-lg transition-colors"
                         title={savedConfig.isFavorite ? "Remove from favorites" : "Add to favorites"}
                       >
-                        <Star 
-                          size={24} 
+                        <Star
+                          size={24}
                           className={savedConfig.isFavorite ? "fill-yellow-300 text-yellow-300" : "text-white/60"}
                         />
                       </button>
-                      
+
                       <h3 className="text-2xl font-bold mb-2 pr-10">{savedConfig.name}</h3>
                       <p className="text-sm opacity-90">{savedConfig.description}</p>
                       <p className="text-xs opacity-75 mt-2">
                         Used {savedConfig.usedCount} time{savedConfig.usedCount !== 1 ? 's' : ''}
                       </p>
                     </div>
-                    
+
                     <div className="p-6">
                       <div className="space-y-2 mb-6">
-                        <FeatureItem 
-                          enabled={savedConfig.config.objectDetection} 
-                          label="Object Detection" 
+                        <FeatureItem
+                          enabled={savedConfig.config.objectDetection}
+                          label="Object Detection"
                           darkMode={darkMode}
                         />
-                        <FeatureItem 
-                          enabled={savedConfig.config.weaponDetection} 
-                          label="Weapon Detection" 
+                        <FeatureItem
+                          enabled={savedConfig.config.weaponDetection}
+                          label="Weapon Detection"
                           darkMode={darkMode}
                         />
-                        <FeatureItem 
-                          enabled={savedConfig.config.faceRecognition} 
-                          label="Face Recognition" 
+                        <FeatureItem
+                          enabled={savedConfig.config.faceRecognition}
+                          label="Face Recognition"
                           darkMode={darkMode}
                         />
-                        <FeatureItem 
-                          enabled={savedConfig.config.runningDetection} 
-                          label="Running Detection" 
+                        <FeatureItem
+                          enabled={savedConfig.config.runningDetection}
+                          label="Running Detection"
                           darkMode={darkMode}
                         />
-                        <FeatureItem 
-                          enabled={savedConfig.config.loiteringDetection} 
-                          label="Loitering Detection" 
+                        <FeatureItem
+                          enabled={savedConfig.config.loiteringDetection}
+                          label="Loitering Detection"
                           darkMode={darkMode}
                         />
-                        <FeatureItem 
-                          enabled={savedConfig.config.crowdDetection} 
-                          label="Crowd Detection" 
+                        <FeatureItem
+                          enabled={savedConfig.config.crowdDetection}
+                          label="Crowd Detection"
                           darkMode={darkMode}
                         />
                       </div>
-                      
-                      <button 
+
+                      <button
                         onClick={() => applyPreset(savedConfig.config)}
                         className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
                       >
@@ -713,9 +732,8 @@ export function AddCamera() {
       )}
 
       {/* Custom Configuration Builder */}
-      <div className={`rounded-xl shadow-sm p-6 border ${
-        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-      }`}>
+      <div className={`rounded-xl shadow-sm p-6 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
         <div className="mb-6">
           <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Custom Configuration</h2>
           <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Build your own detection setup</p>
@@ -767,17 +785,16 @@ export function AddCamera() {
         </div>
 
         <div className="flex items-center gap-3">
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Camera name (e.g., Lobby Camera 1)"
-            className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-              darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
-            }`}
+            className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+              }`}
             value={cameraName}
             onChange={(e) => setCameraName(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && addCustomCamera()}
           />
-          <button 
+          <button
             onClick={addCustomCamera}
             disabled={!cameraName.trim()}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
@@ -790,41 +807,38 @@ export function AddCamera() {
       {/* Name Input Modal */}
       {showNameModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className={`rounded-xl p-6 max-w-md w-full mx-4 ${
-            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'
-          }`}>
+          <div className={`rounded-xl p-6 max-w-md w-full mx-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'
+            }`}>
             <h3 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Name Your Camera</h3>
             <p className={`text-sm mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Enter a name for this camera configuration
             </p>
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Enter camera name (e.g., Main Entrance)"
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4 ${
-                darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
-              }`}
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                }`}
               value={cameraName}
               onChange={(e) => setCameraName(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && saveCamera()}
               autoFocus
             />
             <div className="flex gap-3">
-              <button 
+              <button
                 onClick={saveCamera}
                 disabled={!cameraName.trim()}
                 className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Add Camera
               </button>
-              <button 
+              <button
                 onClick={() => {
                   setShowNameModal(false);
                   setSelectedConfig(null);
                   setCameraName("");
                 }}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
               >
                 Cancel
               </button>
@@ -849,25 +863,24 @@ function FeatureItem({ enabled, label, darkMode }: { enabled: boolean; label: st
   );
 }
 
-function ToggleCard({ 
-  label, 
-  description, 
-  enabled, 
+function ToggleCard({
+  label,
+  description,
+  enabled,
   onToggle,
-  darkMode 
-}: { 
-  label: string; 
-  description: string; 
-  enabled: boolean; 
+  darkMode
+}: {
+  label: string;
+  description: string;
+  enabled: boolean;
   onToggle: () => void;
   darkMode: boolean;
 }) {
   return (
-    <div className={`p-4 rounded-lg border-2 transition-all ${
-      enabled 
-        ? (darkMode ? 'border-blue-500 bg-blue-950' : 'border-blue-500 bg-blue-50')
-        : (darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50')
-    }`}>
+    <div className={`p-4 rounded-lg border-2 transition-all ${enabled
+      ? (darkMode ? 'border-blue-500 bg-blue-950' : 'border-blue-500 bg-blue-50')
+      : (darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50')
+      }`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <h3 className={`font-medium mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>{label}</h3>
@@ -875,13 +888,11 @@ function ToggleCard({
         </div>
         <button
           onClick={onToggle}
-          className={`ml-4 w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-            enabled ? "bg-blue-600" : (darkMode ? "bg-gray-600" : "bg-gray-300")
-          }`}
+          className={`ml-4 w-12 h-6 rounded-full transition-colors flex-shrink-0 ${enabled ? "bg-blue-600" : (darkMode ? "bg-gray-600" : "bg-gray-300")
+            }`}
         >
-          <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
-            enabled ? "translate-x-6" : "translate-x-0.5"
-          }`} />
+          <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${enabled ? "translate-x-6" : "translate-x-0.5"
+            }`} />
         </button>
       </div>
     </div>
