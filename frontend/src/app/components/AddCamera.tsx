@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { Check, ShoppingBag, Building, GraduationCap, Star, Camera, Play, Square, Maximize2 } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { cameraAPI, tokenManager } from "../services/api";
+import { useCameras } from "../context/CameraContext";
+import { useNavigate } from "react-router";
 
 const predefinedTemplates = [
   {
@@ -95,6 +97,11 @@ export function AddCamera() {
     loiteringDetection: false,
     crowdDetection: false,
   });
+
+  const { cameras, refreshCameras } = useCameras();
+  const navigate = useNavigate();
+  const [showOverrideAlert, setShowOverrideAlert] = useState(false);
+  const [pendingCamera, setPendingCamera] = useState<{ name: string, index: number } | null>(null);
 
   // Mock saved configurations
   const [savedConfigs, setSavedConfigs] = useState<SavedConfig[]>([
@@ -376,45 +383,45 @@ export function AddCamera() {
 
   const saveCamera = async () => {
     if (!cameraName.trim() || !selectedConfig) return;
-
-    try {
-      const token = tokenManager.getToken();
-      if (!token) throw new Error("Not authenticated");
-
-      await cameraAPI.registerCamera(token, {
-        name: cameraName,
-        selected_camera: availableCameras.findIndex(c => c.deviceId === selectedCamera),
-        type: "webcam",
-      });
-
-      setShowNameModal(false);
-      setSelectedConfig(null);
-      setCameraName("");
-      alert("Camera saved successfully!");
-    } catch (error) {
-      console.error("Failed to save camera:", error);
-      alert("Failed to save camera. Please try again.");
-    }
+    await registerCamera(cameraName);
+    setShowNameModal(false);
+    setSelectedConfig(null);
+    setCameraName("");
   };
 
   const addCustomCamera = async () => {
     if (!cameraName.trim()) return;
+    await registerCamera(cameraName);
+    setCameraName("");
+  };
 
+  const registerCamera = async (name: string) => {
     try {
       const token = tokenManager.getToken();
       if (!token) throw new Error("Not authenticated");
 
+      const index = availableCameras.findIndex(c => c.deviceId === selectedCamera);
+
+      // Check locally before even hitting the API
+      const alreadyRegistered = cameras.some(c => c.selected_camera === index);
+      if (alreadyRegistered) {
+        alert("This camera is already registered. Delete the existing one first or choose a different camera.");
+        return;
+      }
+
       await cameraAPI.registerCamera(token, {
-        name: cameraName,
-        selected_camera: availableCameras.findIndex(c => c.deviceId === selectedCamera),
+        name,
+        selected_camera: index,
         type: "webcam",
       });
 
-      setCameraName("");
-      alert("Camera added successfully!");
-    } catch (error) {
-      console.error("Failed to add camera:", error);
-      alert("Failed to add camera. Please try again.");
+      await refreshCameras(); // update context immediately
+    } catch (error: any) {
+      const msg = error?.message || "Failed to save camera";
+      alert(msg.includes("already registered") ? 
+        "This camera is already registered on this device." : 
+        "Failed to save camera. Please try again."
+      );
     }
   };
 

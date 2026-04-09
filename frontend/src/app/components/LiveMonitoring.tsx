@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Camera, Circle, Grid3x3, Monitor, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
-import { cameraAPI, tokenManager, BACKEND_BASE_URL } from "../services/api";
-
-
+import { useCameras } from "../context/CameraContext";
+import { WebcamPreview } from "./ui/WebcamPreview";
+import { BACKEND_BASE_URL } from "../services/api";
 
 const mockEvents = [
   { id: 1, type: "Person", confidence: "98%", time: "14:32:45", img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&q=80" },
@@ -16,7 +16,7 @@ type LayoutType = "single" | "main-with-grid" | "grid";
 
 export function LiveMonitoring() {
   const { darkMode } = useSharedDarkMode();
-  const [cameras, setCameras] = useState<any[]>([]);
+  const { cameras } = useCameras();
   const [selectedCamera, setSelectedCamera] = useState<any | null>(null);
   const [objectDetection, setObjectDetection] = useState(true);
   const [faceRecognition, setFaceRecognition] = useState(true);
@@ -25,28 +25,13 @@ export function LiveMonitoring() {
   const [layout, setLayout] = useState<LayoutType>("main-with-grid");
   const [mainCameraIndex, setMainCameraIndex] = useState(0);
 
+  // Fix initial selectedCamera when cameras load
   useEffect(() => {
-    const loadCameras = async () => {
-      try {
-        const token = tokenManager.getToken();
-        if (!token) return;
-
-        const response = await cameraAPI.getCameras(token);
-
-        setCameras(response.cameras || []);
-
-        if (response.cameras && response.cameras.length > 0) {
-          setSelectedCamera(response.cameras[0]);
-          setMainCameraIndex(0);
-        }
-
-      } catch (error) {
-        console.error("Failed to load cameras:", error);
-      }
-    };
-
-    loadCameras();
-  }, []);
+    if (cameras.length > 0 && !selectedCamera) {
+      setSelectedCamera(cameras[0]);
+      setMainCameraIndex(0);
+    }
+  }, [cameras]);
 
   const goToPrevCamera = () => {
     setMainCameraIndex((prev) => (prev === 0 ? cameras.length - 1 : prev - 1));
@@ -74,9 +59,8 @@ export function LiveMonitoring() {
 
     return (
       <div className="relative bg-gray-900 rounded-lg overflow-hidden aspect-video">
-        <img
-          src={`${BACKEND_BASE_URL}/api/camera/stream/${camera?.id}`}
-          alt={camera.name}
+        <WebcamPreview
+          cameraIndex={camera.selected_camera ?? 0}
           className="w-full h-full object-cover opacity-70"
         />
 
@@ -205,16 +189,16 @@ export function LiveMonitoring() {
                       }`}
                     value={selectedCamera?.id || ""}
                     onChange={(e) => {
-                      const camera = cameras.find(c => c.id === parseInt(e.target.value));
-                      if (camera) {
-                        setSelectedCamera(camera);
-                        setMainCameraIndex(cameras.indexOf(camera));
+                      const cam = cameras.find(c => c.id === e.target.value);
+                      if (cam) {
+                        setSelectedCamera(cam);
+                        setMainCameraIndex(cameras.indexOf(cam));
                       }
                     }}
                   >
                     {cameras.map((camera) => (
                       <option key={camera.id} value={camera.id}>
-                        {camera.name} - {camera.location}
+                        {camera.name}
                       </option>
                     ))}
                   </select>
@@ -234,11 +218,9 @@ export function LiveMonitoring() {
                       className={`relative rounded-lg overflow-hidden border-2 transition-colors ${darkMode ? 'border-gray-600 hover:border-blue-400' : 'border-gray-200 hover:border-blue-500'
                         }`}
                     >
-                      <img
-                        src={camera.img}
-                        alt={camera.name}
-                        className="w-full aspect-video object-cover opacity-80 hover:opacity-100 transition-opacity"
-                      />
+                      <div className="w-full aspect-video bg-gray-800 flex items-center justify-center">
+                        <Camera className="text-gray-400" size={24} />
+                      </div>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                       <div className="absolute bottom-1 left-1 right-1">
                         <p className="text-white text-xs font-medium truncate">{camera.name}</p>

@@ -1,14 +1,15 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Wifi, Monitor, Plus, Settings, Eye, AlertTriangle, CameraOff, Play, Pause, Maximize2 } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { useUser } from "../context/UserContext";
-import { cameraAPI, tokenManager, BACKEND_BASE_URL } from "../services/api";
+import { useCameras } from "../context/CameraContext";
+import { WebcamPreview } from "./ui/WebcamPreview";
+
 
 type CameraDevice = {
   id: string;
   name: string;
   source: 'webcam' | 'ip' | 'rtsp';
-  selected_camera?: number;
   url?: string;
   status: 'online' | 'offline' | 'error';
   lastSeen: Date;
@@ -22,7 +23,7 @@ type CameraDevice = {
 export function MonitorDashboard() {
   const { darkMode } = useSharedDarkMode();
   const { user } = useUser();
-  const [cameras, setCameras] = useState<CameraDevice[]>([]);
+  const { cameras, deleteCamera } = useCameras();
   const [showAddCamera, setShowAddCamera] = useState(false);
   const [newCameraType, setNewCameraType] = useState<'ip' | 'rtsp'>('ip');
   const [newCameraUrl, setNewCameraUrl] = useState('');
@@ -31,94 +32,14 @@ export function MonitorDashboard() {
   const [isPaused, setIsPaused] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Mock data for demonstration
-  // useEffect(() => {
-  //   // In a real app, this would fetch from backend
-  //   setCameras([
-  //     {
-  //       id: 'cam-001',
-  //       name: 'Main Entrance',
-  //       source: 'ip',
-  //       url: 'http://192.168.1.100:8080/video',
-  //       status: 'online',
-  //       lastSeen: new Date(),
-  //       detections: { objects: 15, weapons: 0, faces: 8 }
-  //     },
-  //     {
-  //       id: 'cam-002',
-  //       name: 'Parking Lot',
-  //       source: 'rtsp',
-  //       url: 'rtsp://192.168.1.101:554/stream',
-  //       status: 'online',
-  //       lastSeen: new Date(),
-  //       detections: { objects: 3, weapons: 0, faces: 2 }
-  //     },
-  //     {
-  //       id: 'cam-003',
-  //       name: 'Lobby Camera',
-  //       source: 'ip',
-  //       url: 'http://192.168.1.102:8080/video',
-  //       status: 'offline',
-  //       lastSeen: new Date(Date.now() - 5 * 60000), // 5 minutes ago
-  //       detections: { objects: 0, weapons: 0, faces: 0 }
-  //     }
-  //   ]);
-  // }, []);
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-
-    const fetchCameras = async () => {
-      const token = tokenManager.getToken();
-      if (!token) return;
-
-      const response = await fetch(`http://localhost:8000/api/cameras/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (response.status === 401) {
-        clearInterval(interval); // ✅ now works
-        return;
-      }
-
-      const data = await response.json();
-      setCameras(data.map((cam: any) => ({
-        id: cam.id,
-        name: cam.name,
-        source: 'webcam',
-        selected_camera: cam.selected_camera,
-        status: cam.status || 'offline',
-        lastSeen: new Date(cam.last_seen || cam.created_at),
-        detections: { objects: 0, weapons: 0, faces: 0 }
-      })));
-    };
-
-    fetchCameras();
-    interval = setInterval(fetchCameras, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
   const addCamera = () => {
     if (!newCameraName.trim() || !newCameraUrl.trim()) return;
-
-    const newCamera: CameraDevice = {
-      id: `cam-${Date.now()}`,
-      name: newCameraName,
-      source: newCameraType,
-      url: newCameraUrl,
-      status: 'offline', // Will be updated when connection is tested
-      lastSeen: new Date(),
-      detections: { objects: 0, weapons: 0, faces: 0 }
-    };
-
-    setCameras([...cameras, newCamera]);
+    // Note: Camera addition should be handled by the CameraContext
     setNewCameraName('');
     setNewCameraUrl('');
     setShowAddCamera(false);
   };
 
-  const removeCamera = (cameraId: string) => {
-    setCameras(cameras.filter(cam => cam.id !== cameraId));
-  };
 
   const togglePause = () => {
     setIsPaused(!isPaused);
@@ -144,12 +65,7 @@ export function MonitorDashboard() {
     }
   };
 
-  const totalDetections = cameras.reduce((acc, cam) => ({
-    objects: acc.objects + cam.detections.objects,
-    weapons: acc.weapons + cam.detections.weapons,
-    faces: acc.faces + cam.detections.faces
-  }), { objects: 0, weapons: 0, faces: 0 });
-
+  
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -163,8 +79,9 @@ export function MonitorDashboard() {
 
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className={`rounded-xl p-6 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
+        <div className={`rounded-xl p-6 border ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
           <div className="flex items-center justify-between mb-2">
             <CameraOff className={`w-8 h-8 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
             <span className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -174,8 +91,9 @@ export function MonitorDashboard() {
           <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Cameras</p>
         </div>
 
-        <div className={`rounded-xl p-6 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
+        <div className={`rounded-xl p-6 border ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
           <div className="flex items-center justify-between mb-2">
             <Eye className={`w-8 h-8 ${darkMode ? 'text-green-400' : 'text-green-600'}`} />
             <span className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -185,23 +103,25 @@ export function MonitorDashboard() {
           <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Online</p>
         </div>
 
-        <div className={`rounded-xl p-6 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
+        <div className={`rounded-xl p-6 border ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
           <div className="flex items-center justify-between mb-2">
             <AlertTriangle className={`w-8 h-8 ${darkMode ? 'text-red-400' : 'text-red-600'}`} />
             <span className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              {totalDetections.weapons}
+              0
             </span>
           </div>
           <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Weapon Detections</p>
         </div>
 
-        <div className={`rounded-xl p-6 border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
+        <div className={`rounded-xl p-6 border ${
+          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
           <div className="flex items-center justify-between mb-2">
             <Settings className={`w-8 h-8 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
             <span className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              {totalDetections.objects}
+              0
             </span>
           </div>
           <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Object Detections</p>
@@ -224,17 +144,15 @@ export function MonitorDashboard() {
         {cameras.map((camera) => (
           <div
             key={camera.id}
-            className={`rounded-xl overflow-hidden ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-              }`}
+            className={`rounded-xl overflow-hidden ${
+              darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+            }`}
           >
             {/* Live Video Feed */}
             <div className="relative bg-black aspect-video">
               {camera.status === 'online' ? (
                 <>
-                  {camera.status === 'online' && (
-                    <WebcamPreview cameraIndex={camera.selected_camera ?? 0} />
-                  )}
-                  {/* Video Controls */}
+                  <WebcamPreview cameraIndex={camera.selected_camera ?? 0} />
                   <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -253,10 +171,11 @@ export function MonitorDashboard() {
                           <Maximize2 size={16} />
                         </button>
                       </div>
-                      <div className={`px-2 py-1 rounded-full text-xs ${camera.status === 'online' ? 'bg-green-500' :
+                      <div className={`px-2 py-1 rounded-full text-xs ${
+                        camera.status === 'online' ? 'bg-green-500' :
                         camera.status === 'offline' ? 'bg-gray-500' :
-                          'bg-red-500'
-                        }`}>
+                        'bg-red-500'
+                      }`}>
                         {camera.status}
                       </div>
                     </div>
@@ -276,55 +195,32 @@ export function MonitorDashboard() {
                 <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                   {camera.name}
                 </h3>
-                <div className="flex items-center gap-2 mt-1">
-                  {camera.source === 'ip' && <Wifi size={16} className={darkMode ? 'text-gray-400' : 'text-gray-600'} />}
-                  {camera.source === 'rtsp' && <Monitor size={16} className={darkMode ? 'text-gray-400' : 'text-gray-600'} />}
-                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {camera.source.toUpperCase()}
-                  </span>
-                </div>
               </div>
-              <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBg(camera.status)} ${getStatusColor(camera.status)}`}>
+              <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBg(camera.status as any)} ${getStatusColor(camera.status as any)}`}>
                 {camera.status}
               </div>
             </div>
 
             <div className="mb-4">
-              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-1`}>
-                {camera.url}
+              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                ID: {camera.id}
               </p>
               <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                Last seen: {camera.lastSeen.toLocaleTimeString()}
+                Last seen: {camera.last_seen ? new Date(camera.last_seen).toLocaleTimeString() : 'Never'}
               </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              <div className={`text-center p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {camera.detections.objects}
-                </div>
-                <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Objects</div>
-              </div>
-              <div className={`text-center p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {camera.detections.weapons}
-                </div>
-                <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Weapons</div>
-              </div>
-              <div className={`text-center p-2 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                <div className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {camera.detections.faces}
-                </div>
-                <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Faces</div>
-              </div>
             </div>
 
             <button
-              onClick={() => removeCamera(camera.id)}
-              className={`w-full py-2 rounded-lg border transition-colors ${darkMode
-                ? 'border-red-600 text-red-400 hover:bg-red-900'
-                : 'border-red-600 text-red-600 hover:bg-red-50'
-                }`}
+              onClick={async () => {
+                if (confirm(`Remove "${camera.name}"?`)) {
+                  await deleteCamera(camera.id);
+                }
+              }}
+              className={`w-full py-2 rounded-lg border transition-colors ${
+                darkMode 
+                  ? 'border-red-600 text-red-400 hover:bg-red-900' 
+                  : 'border-red-600 text-red-600 hover:bg-red-50'
+              }`}
             >
               Remove Camera
             </button>
@@ -335,8 +231,9 @@ export function MonitorDashboard() {
       {/* Add Camera Modal */}
       {showAddCamera && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className={`rounded-xl p-6 max-w-md w-full mx-4 ${darkMode ? 'bg-gray-800' : 'bg-white'
-            }`}>
+          <div className={`rounded-xl p-6 max-w-md w-full mx-4 ${
+            darkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
             <h3 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
               Add New Camera
             </h3>
@@ -349,20 +246,22 @@ export function MonitorDashboard() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => setNewCameraType('ip')}
-                    className={`p-3 rounded-lg border-2 transition-all ${newCameraType === 'ip'
-                      ? (darkMode ? 'border-blue-500 bg-blue-950' : 'border-blue-500 bg-blue-50')
-                      : (darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50')
-                      }`}
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      newCameraType === 'ip'
+                        ? (darkMode ? 'border-blue-500 bg-blue-950' : 'border-blue-500 bg-blue-50')
+                        : (darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50')
+                    }`}
                   >
                     <Wifi className={`w-6 h-6 mx-auto mb-1 ${newCameraType === 'ip' ? 'text-blue-500' : (darkMode ? 'text-gray-400' : 'text-gray-600')}`} />
                     <div className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>IP Camera</div>
                   </button>
                   <button
                     onClick={() => setNewCameraType('rtsp')}
-                    className={`p-3 rounded-lg border-2 transition-all ${newCameraType === 'rtsp'
-                      ? (darkMode ? 'border-blue-500 bg-blue-950' : 'border-blue-500 bg-blue-50')
-                      : (darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50')
-                      }`}
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      newCameraType === 'rtsp'
+                        ? (darkMode ? 'border-blue-500 bg-blue-950' : 'border-blue-500 bg-blue-50')
+                        : (darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50')
+                    }`}
                   >
                     <Monitor className={`w-6 h-6 mx-auto mb-1 ${newCameraType === 'rtsp' ? 'text-blue-500' : (darkMode ? 'text-gray-400' : 'text-gray-600')}`} />
                     <div className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>RTSP Stream</div>
@@ -379,8 +278,9 @@ export function MonitorDashboard() {
                   placeholder="e.g., Main Entrance Camera"
                   value={newCameraName}
                   onChange={(e) => setNewCameraName(e.target.value)}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
-                    }`}
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                  }`}
                 />
               </div>
 
@@ -390,17 +290,18 @@ export function MonitorDashboard() {
                 </label>
                 <input
                   type="text"
-                  placeholder={newCameraType === 'ip'
-                    ? 'http://192.168.1.100:8080/video'
+                  placeholder={newCameraType === 'ip' 
+                    ? 'http://192.168.1.100:8080/video' 
                     : 'rtsp://username:password@192.168.1.100:554/stream'
                   }
                   value={newCameraUrl}
                   onChange={(e) => setNewCameraUrl(e.target.value)}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
-                    }`}
+                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
+                  }`}
                 />
                 <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {newCameraType === 'ip'
+                  {newCameraType === 'ip' 
                     ? 'Enter the HTTP/HTTPS URL of your IP camera'
                     : 'Enter the RTSP URL of your security camera'
                   }
@@ -422,8 +323,9 @@ export function MonitorDashboard() {
                   setNewCameraName('');
                   setNewCameraUrl('');
                 }}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
               >
                 Cancel
               </button>
@@ -432,49 +334,5 @@ export function MonitorDashboard() {
         </div>
       )}
     </div>
-  );
-}
-
-function WebcamPreview({ cameraIndex }: { cameraIndex: number }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    let stream: MediaStream;
-
-    const start = async () => {
-      try {
-        // Get all video devices and pick by index
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        const device = videoDevices[cameraIndex];
-
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: device ? { deviceId: { exact: device.deviceId } } : true,
-          audio: false
-        });
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (err) {
-        console.error("Webcam error:", err);
-      }
-    };
-
-    start();
-
-    return () => {
-      stream?.getTracks().forEach(t => t.stop());
-    };
-  }, [cameraIndex]);
-
-  return (
-    <video
-      ref={videoRef}
-      autoPlay
-      muted
-      playsInline
-      className="w-full h-full object-cover"
-    />
   );
 }

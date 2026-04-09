@@ -5,7 +5,7 @@ export function UserTypeSelection() {
   const navigate = useNavigate();
 
   const handleSelection = (type: "camera" | "monitor") => {
-    // Navigate to specific add-camera routes
+    sessionStorage.setItem('preferredInterface', type);
     if (type === 'camera') {
       navigate("/camera/dashboard");
     } else {
@@ -21,9 +21,7 @@ export function UserTypeSelection() {
           <p className="text-xl text-gray-300">Vision System</p>
           <p className="text-gray-400 mt-4">Select your account type to continue</p>
         </div>
-
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Camera Option */}
           <button
             onClick={() => handleSelection("camera")}
             className="group bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 hover:bg-white/20 transition-all duration-300 hover:scale-105"
@@ -44,7 +42,6 @@ export function UserTypeSelection() {
             </div>
           </button>
 
-          {/* Monitor Option */}
           <button
             onClick={() => handleSelection("monitor")}
             className="group bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 hover:bg-white/20 transition-all duration-300 hover:scale-105"

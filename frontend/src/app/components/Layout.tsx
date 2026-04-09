@@ -3,23 +3,8 @@ import { useNavigate, useLocation, Link, Outlet } from "react-router";
 import { useUser } from "../context/UserContext";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { UserProfile } from "./UserProfile";
-import {
-  Home,
-  Camera,
-  Users,
-  Bell,
-  BarChart3,
-  Settings,
-  Menu,
-  LogOut,
-  Sun,
-  Moon,
-  User,
-  Video,
-  AlertTriangle,
-  Cog,
-  Monitor
-} from "lucide-react";
+import { CameraProvider } from "../context/CameraContext";
+import { Home, Camera, Users, Bell, BarChart3, Settings, Menu, LogOut, Sun, Moon, User, Video, AlertTriangle, Cog, Monitor } from "lucide-react";
 
 // Camera-specific navigation
 const cameraNavItems = [
@@ -68,15 +53,14 @@ export function Layout() {
     } else {
       document.documentElement.classList.remove('dark');
     }
-    
+
   }, [darkMode]);
 
   return (
     <div className={`flex h-screen ${darkMode ? 'dark' : ''}`}>
       {/* Sidebar */}
-      <aside className={`bg-gray-900 text-white flex flex-col transition-all duration-300 border-r ${
-        sidebarVisible ? "w-64 border-gray-700" : "w-0 border-transparent"
-      } overflow-hidden overflow-y-auto scrollbar-hide`}>
+      <aside className={`bg-gray-900 text-white flex flex-col transition-all duration-300 border-r ${sidebarVisible ? "w-64 border-gray-700" : "w-0 border-transparent"
+        } overflow-hidden overflow-y-auto scrollbar-hide`}>
         {/* Logo with Menu Toggle */}
         <div className="p-6 border-b border-gray-800 flex items-center gap-4">
           <button
@@ -107,11 +91,10 @@ export function Layout() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  isActive
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
                     ? "bg-blue-600 text-white"
                     : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                }`}
+                  }`}
               >
                 <Icon size={20} />
                 <span>{item.label}</span>
@@ -166,7 +149,6 @@ export function Layout() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto relative">
-        {/* Hamburger Menu Button */}
         {!sidebarVisible && (
           <button
             onClick={() => setSidebarVisible(true)}
@@ -176,13 +158,15 @@ export function Layout() {
             <Menu size={24} />
           </button>
         )}
-        <Outlet />
+        <CameraProvider>
+          <Outlet />
+        </CameraProvider>
       </main>
 
       {/* User Profile Modal */}
-      <UserProfile 
-        show={showUserProfile} 
-        onClose={() => setShowUserProfile(false)} 
+      <UserProfile
+        show={showUserProfile}
+        onClose={() => setShowUserProfile(false)}
       />
     </div>
   );

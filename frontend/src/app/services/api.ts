@@ -1,5 +1,6 @@
 export const BACKEND_BASE_URL =
-  import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+  import.meta.env.VITE_BACKEND_URL ||
+  `http://${window.location.hostname}:8000`;
 
 const API_BASE_URL = `${BACKEND_BASE_URL}/api/v1`;
 const CAMERA_API_URL = `${BACKEND_BASE_URL}/api/cameras`;
@@ -196,6 +197,17 @@ export const authAPI = {
     const data = await response.json();
     console.log('API: Success response:', data);
     return data;
+  },
+
+  // Refresh token
+  refreshToken: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Refresh failed');
+    const result = await response.json();
+    return result.token;
   },
 };
 

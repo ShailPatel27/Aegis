@@ -14,7 +14,7 @@ from auth.models import (
 )
 
 from auth.services import auth_service
-from utils.security import verify_token
+from utils.security import verify_token, generate_access_token
 from database.supabase import supabase
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
@@ -128,3 +128,10 @@ async def get_current_user(
             status_code=401,
             detail="Invalid authentication credentials"
         )
+
+
+@router.post("/refresh")
+async def refresh_token(user=Depends(get_current_user)):
+    """Issue a new token for an authenticated user"""
+    new_token = generate_access_token({"user_id": user["id"], "email": user["email"]})
+    return {"success": True, "token": new_token}

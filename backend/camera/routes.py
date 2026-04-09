@@ -25,6 +25,20 @@ async def register_camera(
     try:
         device_id = get_device_id()
 
+        # Check for duplicate camera index on same device
+        existing = supabase.table("cameras") \
+            .select("id") \
+            .eq("user_id", user["id"]) \
+            .eq("selected_camera", camera.selected_camera) \
+            .eq("device_id", device_id) \
+            .execute()
+
+        if existing.data:
+            raise HTTPException(
+                status_code=400,
+                detail="A camera with this index is already registered on this device"
+            )
+
         data = {
             "id": str(uuid4()),
             "user_id": user["id"],
