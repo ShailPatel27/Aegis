@@ -14,6 +14,7 @@ from camera.stream import router as camera_stream_router
 from camera.routes import router as camera_router
 from camera.status import start_status_monitor
 from fastapi.responses import HTMLResponse
+from camera.webrtc import router as webrtc_router
 
 def is_port_available(port: int) -> bool:
     """Check if port is available"""
@@ -73,6 +74,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(camera_stream_router, prefix="/api/camera")
 app.include_router(camera_router, prefix="/api/cameras")
+app.include_router(webrtc_router, prefix="/api/webrtc")
 
 
 @app.get("/test")

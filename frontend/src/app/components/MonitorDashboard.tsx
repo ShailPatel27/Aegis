@@ -4,6 +4,7 @@ import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { useUser } from "../context/UserContext";
 import { useCameras } from "../context/CameraContext";
 import { WebcamPreview } from "./ui/WebcamPreview";
+import { WebRTCMonitorView } from "./WebRTCMonitorView";
 
 
 type CameraDevice = {
@@ -152,7 +153,7 @@ export function MonitorDashboard() {
             <div className="relative bg-black aspect-video">
               {camera.status === 'online' ? (
                 <>
-                  <WebcamPreview cameraIndex={camera.selected_camera ?? 0} />
+                  <WebRTCMonitorView cameraId={camera.id} />
                   <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">

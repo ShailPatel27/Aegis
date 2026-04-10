@@ -4,6 +4,7 @@ import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { cameraAPI, tokenManager } from "../services/api";
 import { useCameras } from "../context/CameraContext";
 import { useNavigate } from "react-router";
+import { useCameraStream } from "../hooks/useWebRTC"
 
 const predefinedTemplates = [
   {
@@ -100,6 +101,12 @@ export function AddCamera() {
 
   const { cameras, refreshCameras } = useCameras();
   const navigate = useNavigate();
+
+  // Send camera stream to backend via WebRTC
+  const { status: streamStatus } = useCameraStream(
+    cameras[0]?.id ?? "",           // use registered camera id
+    streamRef.current               // MediaStream from getUserMedia
+  );
   const [showOverrideAlert, setShowOverrideAlert] = useState(false);
   const [pendingCamera, setPendingCamera] = useState<{ name: string, index: number } | null>(null);
 
