@@ -17,14 +17,24 @@ def start_heartbeat(camera_id: str, user_id: str):
     def heartbeat():
         while True:
             try:
-                supabase.table("cameras") \
-                    .update({
-                        "status": "online",
-                        "last_seen": datetime.utcnow().isoformat()
-                    }) \
+                response = supabase.table("cameras") \
+                    .select("status") \
                     .eq("id", camera_id) \
                     .eq("user_id", user_id) \
+                    .single() \
                     .execute()
+
+                camera = response.data
+
+                if camera and camera.get("status") == "online":
+                    supabase.table("cameras") \
+                        .update({
+                            "status": "online",
+                            "last_seen": datetime.utcnow().isoformat()
+                        }) \
+                        .eq("id", camera_id) \
+                        .eq("user_id", user_id) \
+                        .execute()
 
             except Exception:
                 pass

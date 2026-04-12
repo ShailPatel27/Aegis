@@ -17,6 +17,14 @@ class CameraRegister(BaseModel):
     type: Optional[str] = "webcam"
     location: Optional[str] = None
 
+
+class CameraStreamToggle(BaseModel):
+    enabled: bool
+
+
+def is_stream_enabled(camera: dict) -> bool:
+    return camera.get("status") == "online"
+
 @router.post("/register")
 async def register_camera(
     camera: CameraRegister,
@@ -47,7 +55,7 @@ async def register_camera(
             "selected_camera": camera.selected_camera,
             "type": camera.type,
             "location": camera.location,
-            "status": "offline",
+            "status": "online",
             "created_at": datetime.utcnow().isoformat(),
         }
 
@@ -57,9 +65,17 @@ async def register_camera(
         return {
             "success": True,
             "camera_id": data["id"],
-            "camera": response.data,
+            "camera": [
+                {
+                    **row,
+                    "stream_enabled": is_stream_enabled(row),
+                }
+                for row in response.data
+            ],
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -74,7 +90,13 @@ async def get_cameras(user=Depends(get_current_user)):
             .execute()
         )
 
-        return response.data
+        return [
+            {
+                **row,
+                "stream_enabled": is_stream_enabled(row),
+            }
+            for row in response.data
+        ]
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -107,5 +129,46 @@ async def camera_heartbeat(camera_id: str, user=Depends(get_current_user)):
 
         return {"success": True}
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{camera_id}/stream")
+async def set_camera_stream_state(
+    camera_id: str,
+    payload: CameraStreamToggle,
+    user=Depends(get_current_user),
+):
+    try:
+        supabase.table("cameras") \
+            .update({
+                "status": "online" if payload.enabled else "offline",
+            }) \
+            .eq("id", camera_id) \
+            .eq("user_id", user["id"]) \
+            .execute()
+
+        camera_response = (
+            supabase.table("cameras")
+            .select("*")
+            .eq("id", camera_id)
+            .eq("user_id", user["id"])
+            .single()
+            .execute()
+        )
+
+        if not camera_response.data:
+            raise HTTPException(status_code=404, detail="Camera not found")
+
+        return {
+            "success": True,
+            "camera": {
+                **camera_response.data,
+                "stream_enabled": is_stream_enabled(camera_response.data),
+            },
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

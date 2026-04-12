@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { cameraAPI, tokenManager, authAPI } from "../services/api";
 
 type Camera = {
@@ -6,6 +6,9 @@ type Camera = {
   name: string;
   selected_camera: number;
   status: string;
+  stream_enabled?: boolean;
+  location?: string | null;
+  type?: string;
   created_at: string;
   last_seen?: string;
 };
@@ -19,6 +22,7 @@ type CameraContextType = {
   cameras: Camera[];
   refreshCameras: () => Promise<void>;
   deleteCamera: (id: string) => Promise<void>;
+  setCameraStreamState: (id: string, enabled: boolean) => Promise<void>;
   getStream: (cameraIndex: number) => Promise<MediaStream | null>;
   releaseStream: (cameraIndex: number) => void;
 };
@@ -29,12 +33,26 @@ export function CameraProvider({ children }: { children: ReactNode }) {
   const [cameras, setCameras] = useState<Camera[]>([]);
   const streams = useRef<Map<number, StreamEntry>>(new Map());
 
-  const refreshCameras = async () => {
+  const clearSession = useCallback(() => {
+    tokenManager.removeToken();
+    localStorage.removeItem("aegis_user");
+    setCameras([]);
+  }, []);
+
+  const refreshCameras = useCallback(async () => {
     const token = tokenManager.getToken();
     if (!token) return;
-    const data = await cameraAPI.getCameras(token);
-    setCameras(Array.isArray(data) ? data : []);
-  };
+    try {
+      const data = await cameraAPI.getCameras(token);
+      setCameras(Array.isArray(data) ? data : []);
+    } catch (error) {
+      if (error instanceof Error && error.message === "Unauthorized") {
+        clearSession();
+        return;
+      }
+      throw error;
+    }
+  }, [clearSession]);
 
   const silentTokenRefresh = async () => {
     const token = tokenManager.getToken();
@@ -50,15 +68,38 @@ export function CameraProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const deleteCamera = async (id: string) => {
+  const deleteCamera = useCallback(async (id: string) => {
     const token = tokenManager.getToken();
     if (!token) return;
-    await cameraAPI.deleteCamera(token, id);
-    await refreshCameras();
-  };
+    try {
+      await cameraAPI.deleteCamera(token, id);
+      await refreshCameras();
+    } catch (error) {
+      if (error instanceof Error && error.message === "Unauthorized") {
+        clearSession();
+        return;
+      }
+      throw error;
+    }
+  }, [clearSession, refreshCameras]);
+
+  const setCameraStreamState = useCallback(async (id: string, enabled: boolean) => {
+    const token = tokenManager.getToken();
+    if (!token) return;
+    try {
+      await cameraAPI.setCameraStreamState(token, id, enabled);
+      await refreshCameras();
+    } catch (error) {
+      if (error instanceof Error && error.message === "Unauthorized") {
+        clearSession();
+        return;
+      }
+      throw error;
+    }
+  }, [clearSession, refreshCameras]);
 
   // Shared stream — if two components need same index, reuse same MediaStream
-  const getStream = async (cameraIndex: number): Promise<MediaStream | null> => {
+  const getStream = useCallback(async (cameraIndex: number): Promise<MediaStream | null> => {
     const existing = streams.current.get(cameraIndex);
     if (existing) {
       existing.refCount++;
@@ -81,9 +122,9 @@ export function CameraProvider({ children }: { children: ReactNode }) {
       console.error(`Failed to get stream for camera ${cameraIndex}:`, err);
       return null;
     }
-  };
+  }, []);
 
-  const releaseStream = (cameraIndex: number) => {
+  const releaseStream = useCallback((cameraIndex: number) => {
     const entry = streams.current.get(cameraIndex);
     if (!entry) return;
 
@@ -92,7 +133,7 @@ export function CameraProvider({ children }: { children: ReactNode }) {
       entry.stream.getTracks().forEach(t => t.stop());
       streams.current.delete(cameraIndex);
     }
-  };
+  }, []);
 
   useEffect(() => {
     refreshCameras();
@@ -108,7 +149,7 @@ export function CameraProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <CameraContext.Provider value={{ cameras, refreshCameras, deleteCamera, getStream, releaseStream }}>
+    <CameraContext.Provider value={{ cameras, refreshCameras, deleteCamera, setCameraStreamState, getStream, releaseStream }}>
       {children}
     </CameraContext.Provider>
   );

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Camera, Circle, Grid3x3, Monitor, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { useCameras } from "../context/CameraContext";
-import { WebcamPreview } from "./ui/WebcamPreview";
-import { BACKEND_BASE_URL } from "../services/api";
+import { WebRTCMonitorView } from "./WebRTCMonitorView";
+import { useLocation } from "react-router";
 
 const mockEvents = [
   { id: 1, type: "Person", confidence: "98%", time: "14:32:45", img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&q=80" },
@@ -14,9 +14,73 @@ const mockEvents = [
 
 type LayoutType = "single" | "main-with-grid" | "grid";
 
+function LocalCameraPreview({
+  cameraIndex,
+  className = "w-full h-full object-cover",
+}: {
+  cameraIndex: number;
+  className?: string;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const { getStream, releaseStream } = useCameras();
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadStream = async () => {
+      const stream = await getStream(cameraIndex);
+      if (!isActive) {
+        if (stream) {
+          releaseStream(cameraIndex);
+        }
+        return;
+      }
+      setLocalStream(stream);
+    };
+
+    loadStream();
+
+    return () => {
+      isActive = false;
+      releaseStream(cameraIndex);
+      setLocalStream(null);
+    };
+  }, [cameraIndex, getStream, releaseStream]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
+
+  if (!localStream) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 text-gray-500 min-h-[180px]">
+        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
+        <p className="text-sm">Opening camera...</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        className={className}
+      />
+    </>
+  );
+}
+
 export function LiveMonitoring() {
   const { darkMode } = useSharedDarkMode();
   const { cameras } = useCameras();
+  const location = useLocation();
+  const isCameraRoute = location.pathname.startsWith("/camera");
   const [selectedCamera, setSelectedCamera] = useState<any | null>(null);
   const [objectDetection, setObjectDetection] = useState(true);
   const [faceRecognition, setFaceRecognition] = useState(true);
@@ -59,10 +123,17 @@ export function LiveMonitoring() {
 
     return (
       <div className="relative bg-gray-900 rounded-lg overflow-hidden aspect-video">
-        <WebcamPreview
-          cameraIndex={camera.selected_camera ?? 0}
-          className="w-full h-full object-cover opacity-70"
-        />
+        {isCameraRoute ? (
+          <LocalCameraPreview
+            cameraIndex={camera.selected_camera}
+            className="w-full h-full object-cover opacity-90"
+          />
+        ) : (
+          <WebRTCMonitorView
+            cameraId={camera.id}
+            className="w-full h-full object-cover opacity-70"
+          />
+        )}
 
         {/* Live Indicator */}
         <div className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">

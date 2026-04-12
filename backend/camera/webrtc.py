@@ -17,6 +17,7 @@ router = APIRouter()
 
 # One relay per camera stream — efficiently shares one stream to many monitors
 relays: Dict[str, MediaRelay] = {}
+camera_tracks: Dict[str, object] = {}
 
 # Active peer connections — track all to clean up properly  
 camera_pcs: Dict[str, RTCPeerConnection] = {}  # camera_id → pc
@@ -31,6 +32,8 @@ async def cleanup_pc(pc: RTCPeerConnection, camera_id: str, role: str):
             del camera_pcs[camera_id]
         if camera_id in relays:
             del relays[camera_id]
+        if camera_id in camera_tracks:
+            del camera_tracks[camera_id]
         logger.info(f"Camera {camera_id} disconnected")
     else:
         if camera_id in monitor_pcs:
@@ -53,8 +56,7 @@ async def camera_endpoint(websocket: WebSocket, camera_id: str):
     async def on_track(track):
         logger.info(f"Camera {camera_id} sending {track.kind} track")
         if track.kind == "video":
-            # Store relayed track for monitors to subscribe to
-            relays[camera_id].subscribe(track)
+            camera_tracks[camera_id] = track
 
     @pc.on("connectionstatechange")
     async def on_state_change():
@@ -118,7 +120,7 @@ async def monitor_endpoint(websocket: WebSocket, camera_id: str):
 
     try:
         # Check if camera stream is available
-        if camera_id not in relays:
+        if camera_id not in relays or camera_id not in camera_tracks:
             await websocket.send_text(json.dumps({
                 "type": "error",
                 "message": "Camera stream not available"
@@ -128,8 +130,7 @@ async def monitor_endpoint(websocket: WebSocket, camera_id: str):
 
         # Add relayed track to monitor's peer connection
         relay = relays[camera_id]
-        pc.addTrack(relay.subscribe(list(camera_pcs[camera_id]._tracks.values())[0] 
-                                     if camera_id in camera_pcs else None))
+        pc.addTrack(relay.subscribe(camera_tracks[camera_id]))
 
         # Monitor sends offer → backend answers with camera stream
         while True:

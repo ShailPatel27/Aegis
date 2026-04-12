@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Check, ShoppingBag, Building, GraduationCap, Star, Camera, Play, Square, Maximize2 } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { cameraAPI, tokenManager } from "../services/api";
@@ -88,6 +88,7 @@ export function AddCamera() {
   // Refs for video stream
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const [customConfig, setCustomConfig] = useState<CameraConfig>({
@@ -101,11 +102,17 @@ export function AddCamera() {
 
   const { cameras, refreshCameras } = useCameras();
   const navigate = useNavigate();
+  const selectedCameraIndex = availableCameras.findIndex(c => c.deviceId === selectedCamera);
+  const activeCameraRecordId = useMemo(() => {
+    if (selectedCameraIndex < 0) return "";
+    const matchingCamera = cameras.find((camera) => camera.selected_camera === selectedCameraIndex);
+    return matchingCamera?.id ?? "";
+  }, [cameras, selectedCameraIndex]);
 
   // Send camera stream to backend via WebRTC
   const { status: streamStatus } = useCameraStream(
-    cameras[0]?.id ?? "",           // use registered camera id
-    streamRef.current               // MediaStream from getUserMedia
+    activeCameraRecordId,
+    activeStream                    // MediaStream from getUserMedia
   );
   const [showOverrideAlert, setShowOverrideAlert] = useState(false);
   const [pendingCamera, setPendingCamera] = useState<{ name: string, index: number } | null>(null);
@@ -321,6 +328,7 @@ export function AddCamera() {
 
   const setupStream = async (stream: MediaStream) => {
     streamRef.current = stream;
+    setActiveStream(stream);  // ✅ triggers WebRTC hook
     videoRef.current!.srcObject = stream;
 
     videoRef.current!.onloadedmetadata = () => {
@@ -341,6 +349,7 @@ export function AddCamera() {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
+      setActiveStream(null);  // ✅ stops WebRTC hook
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null;

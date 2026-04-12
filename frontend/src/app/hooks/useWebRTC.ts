@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { BACKEND_BASE_URL } from "../services/api";
 
-const WS_BASE = BACKEND_BASE_URL.replace("https://", "wss://").replace("http://", "ws://");
+const WS_BASE =
+  import.meta.env.VITE_BACKEND_WS_URL ||
+  BACKEND_BASE_URL.replace("https://", "wss://").replace("http://", "ws://");
 
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
@@ -15,7 +17,12 @@ export function useCameraStream(cameraId: string, localStream: MediaStream | nul
   const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
 
   useEffect(() => {
-    if (!localStream || !cameraId) return;
+    if (!localStream || !cameraId) {
+      setStatus("idle");
+      return;
+    }
+
+    let isDisposed = false;
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     pcRef.current = pc;
@@ -23,15 +30,30 @@ export function useCameraStream(cameraId: string, localStream: MediaStream | nul
     // Add local camera tracks to peer connection
     localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
-    const ws = new WebSocket(`${WS_BASE}/api/webrtc/ws/camera/${cameraId}`);
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(`${WS_BASE}/api/webrtc/ws/camera/${cameraId}`);
+    } catch (error) {
+      console.error("Failed to open camera WebSocket:", error);
+      setStatus("error");
+      return () => {
+        isDisposed = true;
+        pc.close();
+      };
+    }
     wsRef.current = ws;
 
     ws.onopen = async () => {
+      if (isDisposed) return;
       setStatus("connecting");
 
       // Collect ICE candidates and send them
       pc.onicecandidate = (e) => {
-        if (e.candidate) {
+        if (
+          e.candidate &&
+          ws.readyState === WebSocket.OPEN &&
+          !isDisposed
+        ) {
           ws.send(JSON.stringify({
             type: "candidate",
             candidate: e.candidate.candidate,
@@ -43,28 +65,52 @@ export function useCameraStream(cameraId: string, localStream: MediaStream | nul
 
       // Create and send offer
       const offer = await pc.createOffer();
+      if (isDisposed) return;
       await pc.setLocalDescription(offer);
-      ws.send(JSON.stringify({ type: offer.type, sdp: offer.sdp }));
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: offer.type, sdp: offer.sdp }));
+      }
     };
 
     ws.onmessage = async (e) => {
+      if (isDisposed) return;
       const msg = JSON.parse(e.data);
       if (msg.type === "answer") {
         await pc.setRemoteDescription(new RTCSessionDescription(msg));
-        setStatus("connected");
+        if (!isDisposed) {
+          setStatus("connected");
+        }
+      }
+    };
+
+    ws.onclose = () => {
+      if (!isDisposed && status !== "connected") {
+        setStatus("error");
       }
     };
 
     pc.onconnectionstatechange = () => {
+      if (isDisposed) return;
       if (pc.connectionState === "connected") setStatus("connected");
-      if (pc.connectionState === "failed") setStatus("error");
+      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+        setStatus("error");
+      }
     };
 
-    ws.onerror = () => setStatus("error");
+    ws.onerror = () => {
+      if (!isDisposed) {
+        setStatus("error");
+      }
+    };
 
     return () => {
+      isDisposed = true;
+      pc.onicecandidate = null;
+      pc.onconnectionstatechange = null;
       pc.close();
-      ws.close();
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
     };
   }, [localStream, cameraId]);
 
@@ -79,24 +125,47 @@ export function useMonitorStream(cameraId: string) {
   const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error" | "unavailable">("idle");
 
   useEffect(() => {
-    if (!cameraId) return;
+    if (!cameraId) {
+      setRemoteStream(null);
+      setStatus("idle");
+      return;
+    }
+
+    let isDisposed = false;
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
     pcRef.current = pc;
 
     // Receive remote stream
     pc.ontrack = (e) => {
-      setRemoteStream(e.streams[0]);
+      if (!isDisposed) {
+        setRemoteStream(e.streams[0]);
+      }
     };
 
-    const ws = new WebSocket(`${WS_BASE}/api/webrtc/ws/monitor/${cameraId}`);
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(`${WS_BASE}/api/webrtc/ws/monitor/${cameraId}`);
+    } catch (error) {
+      console.error("Failed to open monitor WebSocket:", error);
+      setStatus("error");
+      return () => {
+        isDisposed = true;
+        pc.close();
+      };
+    }
     wsRef.current = ws;
 
     ws.onopen = async () => {
+      if (isDisposed) return;
       setStatus("connecting");
 
       pc.onicecandidate = (e) => {
-        if (e.candidate) {
+        if (
+          e.candidate &&
+          ws.readyState === WebSocket.OPEN &&
+          !isDisposed
+        ) {
           ws.send(JSON.stringify({
             type: "candidate",
             candidate: e.candidate.candidate,
@@ -110,11 +179,15 @@ export function useMonitorStream(cameraId: string) {
       pc.addTransceiver("video", { direction: "recvonly" });
 
       const offer = await pc.createOffer();
+      if (isDisposed) return;
       await pc.setLocalDescription(offer);
-      ws.send(JSON.stringify({ type: offer.type, sdp: offer.sdp }));
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: offer.type, sdp: offer.sdp }));
+      }
     };
 
     ws.onmessage = async (e) => {
+      if (isDisposed) return;
       const msg = JSON.parse(e.data);
 
       if (msg.type === "error") {
@@ -124,20 +197,41 @@ export function useMonitorStream(cameraId: string) {
 
       if (msg.type === "answer") {
         await pc.setRemoteDescription(new RTCSessionDescription(msg));
-        setStatus("connected");
+        if (!isDisposed) {
+          setStatus("connected");
+        }
+      }
+    };
+
+    ws.onclose = () => {
+      if (!isDisposed && status !== "connected") {
+        setStatus("unavailable");
       }
     };
 
     pc.onconnectionstatechange = () => {
+      if (isDisposed) return;
       if (pc.connectionState === "connected") setStatus("connected");
-      if (pc.connectionState === "failed") setStatus("error");
+      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+        setStatus("error");
+      }
     };
 
-    ws.onerror = () => setStatus("error");
+    ws.onerror = () => {
+      if (!isDisposed) {
+        setStatus("error");
+      }
+    };
 
     return () => {
+      isDisposed = true;
+      pc.onicecandidate = null;
+      pc.onconnectionstatechange = null;
+      pc.ontrack = null;
       pc.close();
-      ws.close();
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
     };
   }, [cameraId]);
 

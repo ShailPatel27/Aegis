@@ -42,8 +42,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const token = tokenManager.getToken();
-    if (token && !user) {
+    if (token) {
       validateToken(token);
+    } else if (user) {
+      setUser(null);
+      localStorage.removeItem("aegis_user");
     }
   }, []);
 

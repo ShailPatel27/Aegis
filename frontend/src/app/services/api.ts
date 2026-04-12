@@ -223,6 +223,10 @@ export const cameraAPI = {
       },
     });
 
+    if (response.status === 401) {
+      throw new Error("Unauthorized");
+    }
+
     if (!response.ok) {
       return [];
     }
@@ -245,8 +249,40 @@ export const cameraAPI = {
       body: JSON.stringify(cameraData),
     });
 
+    if (response.status === 401) {
+      throw new Error("Unauthorized");
+    }
+
     if (!response.ok) {
       throw new Error("Failed to register camera");
+    }
+
+    return response.json();
+  },
+
+  setCameraStreamState: async (token: string, cameraId: string, enabled: boolean) => {
+    const response = await fetch(`${CAMERA_API_URL}/${cameraId}/stream`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ enabled }),
+    });
+
+    if (response.status === 401) {
+      throw new Error("Unauthorized");
+    }
+
+    if (!response.ok) {
+      let message = "Failed to update camera stream state";
+      try {
+        const error = await response.json();
+        message = error.detail || error.message || message;
+      } catch {
+        // Ignore non-JSON error bodies and keep fallback message.
+      }
+      throw new Error(message);
     }
 
     return response.json();
@@ -259,6 +295,10 @@ export const cameraAPI = {
         Authorization: `Bearer ${token}`,
       },
     });
+
+    if (response.status === 401) {
+      throw new Error("Unauthorized");
+    }
 
     if (!response.ok) {
       throw new Error("Failed to delete camera");
