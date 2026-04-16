@@ -88,62 +88,7 @@ export const router = createBrowserRouter([
       { index: true, element: <CameraOrMonitorRoute /> },
     ],
   },
-  {
-    path: "/camera/dashboard",
-    element: (
-      <ProtectedRoute>
-        <Layout />
-      </ProtectedRoute>
-    ),
-    children: [
-      { index: true, element: <Dashboard /> },
-    ],
-  },
-  {
-    path: "/camera/live",
-    element: (
-      <ProtectedRoute>
-        <Layout />
-      </ProtectedRoute>
-    ),
-    children: [
-      { index: true, element: <LiveMonitoring /> },
-    ],
-  },
-  {
-    path: "/camera/faces",
-    element: (
-      <ProtectedRoute>
-        <Layout />
-      </ProtectedRoute>
-    ),
-    children: [
-      { index: true, element: <FaceRecognition /> },
-    ],
-  },
-  {
-    path: "/camera/alerts",
-    element: (
-      <ProtectedRoute>
-        <Layout />
-      </ProtectedRoute>
-    ),
-    children: [
-      { index: true, element: <Alerts /> },
-    ],
-  },
-  {
-    path: "/camera/analytics",
-    element: (
-      <ProtectedRoute>
-        <Layout />
-      </ProtectedRoute>
-    ),
-    children: [
-      { index: true, element: <Analytics /> },
-    ],
-  },
-  {
+    {
     path: "/camera/camera-config",
     element: (
       <ProtectedRoute>
@@ -189,6 +134,17 @@ export const router = createBrowserRouter([
   },
   {
     path: "/monitor/faces",
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <FaceRecognition /> },
+    ],
+  },
+  {
+    path: "/camera/faces",
     element: (
       <ProtectedRoute>
         <Layout />

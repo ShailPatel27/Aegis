@@ -10,12 +10,8 @@ import { Home, Camera, Users, Bell, BarChart3, Settings, Menu, LogOut, Sun, Moon
 
 // Camera-specific navigation
 const cameraNavItems = [
-  { path: "/camera/dashboard", label: "Dashboard", icon: Home },
   { path: "/camera/add-camera", label: "Add Camera", icon: Camera },
-  { path: "/camera/live", label: "Live Monitoring", icon: Video },
   { path: "/camera/faces", label: "Face Recognition", icon: User },
-  { path: "/camera/alerts", label: "Alerts", icon: AlertTriangle },
-  { path: "/camera/analytics", label: "Analytics", icon: BarChart3 },
   { path: "/camera/camera-config", label: "Camera Configuration", icon: Cog },
   { path: "/camera/settings", label: "Settings", icon: Settings },
 ];
@@ -183,7 +179,7 @@ export function Layout() {
           <button
             onClick={() => {
               const isCamera = location.pathname.startsWith('/camera');
-              navigate(isCamera ? "/monitor/dashboard" : "/camera/dashboard");
+              navigate(isCamera ? "/monitor/dashboard" : "/camera/add-camera");
             }}
             className="flex items-center gap-2 w-full px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg mb-2 transition-colors"
           >

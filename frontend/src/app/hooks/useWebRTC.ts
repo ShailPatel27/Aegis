@@ -43,11 +43,10 @@ export function useCameraStream(cameraId: string, localStream: MediaStream | nul
     }
     wsRef.current = ws;
 
-    ws.onopen = async () => {
+    ws.onopen = () => {
       if (isDisposed) return;
       setStatus("connecting");
 
-      // Collect ICE candidates and send them
       pc.onicecandidate = (e) => {
         if (
           e.candidate &&
@@ -63,23 +62,47 @@ export function useCameraStream(cameraId: string, localStream: MediaStream | nul
         }
       };
 
-      // Create and send offer
-      const offer = await pc.createOffer();
-      if (isDisposed) return;
-      await pc.setLocalDescription(offer);
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: offer.type, sdp: offer.sdp }));
-      }
+      // Add 500ms delay to prevent deadlock
+      setTimeout(async () => {
+        if (isDisposed || pc.signalingState !== "stable") return;
+        
+        const offer = await pc.createOffer();
+        if (isDisposed) return;
+        await pc.setLocalDescription(offer);
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: offer.type, sdp: offer.sdp }));
+        }
+      }, 500);
     };
 
     ws.onmessage = async (e) => {
       if (isDisposed) return;
+
       const msg = JSON.parse(e.data);
+
+      if (msg.type === "ready") {
+        const offer = await pc.createOffer();
+        if (isDisposed) return;
+
+        await pc.setLocalDescription(offer);
+
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: offer.type,
+            sdp: offer.sdp
+          }));
+        }
+      }
+
       if (msg.type === "answer") {
         await pc.setRemoteDescription(new RTCSessionDescription(msg));
         if (!isDisposed) {
           setStatus("connected");
         }
+      }
+
+      if (msg.type === "candidate") {
+        await pc.addIceCandidate(msg);
       }
     };
 
@@ -178,12 +201,17 @@ export function useMonitorStream(cameraId: string) {
       // Add transceiver to receive video
       pc.addTransceiver("video", { direction: "recvonly" });
 
-      const offer = await pc.createOffer();
-      if (isDisposed) return;
-      await pc.setLocalDescription(offer);
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: offer.type, sdp: offer.sdp }));
-      }
+      // Add 500ms delay to prevent deadlock
+      setTimeout(async () => {
+        if (isDisposed || pc.signalingState !== "stable") return;
+        
+        const offer = await pc.createOffer();
+        if (isDisposed) return;
+        await pc.setLocalDescription(offer);
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: offer.type, sdp: offer.sdp }));
+        }
+      }, 500);
     };
 
     ws.onmessage = async (e) => {
@@ -200,6 +228,12 @@ export function useMonitorStream(cameraId: string) {
         if (!isDisposed) {
           setStatus("connected");
         }
+      } else if (msg.type === "candidate") {
+        await pc.addIceCandidate({
+          candidate: msg.candidate,
+          sdpMid: msg.sdpMid,
+          sdpMLineIndex: msg.sdpMLineIndex
+        });
       }
     };
 

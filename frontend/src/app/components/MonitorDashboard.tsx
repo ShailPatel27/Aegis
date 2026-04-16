@@ -71,7 +71,7 @@ export function MonitorDashboard() {
     <div className="p-8">
       <div className="mb-8">
         <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-          Monitor Dashboard
+          Add Camera
         </h1>
         <p className={`mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
           Manage all cameras and monitor detection activity
@@ -79,7 +79,7 @@ export function MonitorDashboard() {
       </div>
 
       {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-2 gap-10 mb-8">
         <div className={`rounded-xl p-6 border ${
           darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
         }`}>
@@ -102,30 +102,6 @@ export function MonitorDashboard() {
             </span>
           </div>
           <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Online</p>
-        </div>
-
-        <div className={`rounded-xl p-6 border ${
-          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-        }`}>
-          <div className="flex items-center justify-between mb-2">
-            <AlertTriangle className={`w-8 h-8 ${darkMode ? 'text-red-400' : 'text-red-600'}`} />
-            <span className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              0
-            </span>
-          </div>
-          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Weapon Detections</p>
-        </div>
-
-        <div className={`rounded-xl p-6 border ${
-          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-        }`}>
-          <div className="flex items-center justify-between mb-2">
-            <Settings className={`w-8 h-8 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
-            <span className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              0
-            </span>
-          </div>
-          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Object Detections</p>
         </div>
       </div>
 

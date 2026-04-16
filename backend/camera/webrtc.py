@@ -49,8 +49,23 @@ async def camera_endpoint(websocket: WebSocket, camera_id: str):
     """
     await websocket.accept()
     pc = RTCPeerConnection()
-    camera_pcs[camera_id] = pc
-    relays[camera_id] = MediaRelay()
+
+    try:
+        await websocket.send_text(json.dumps({"type": "ready"}))
+    except Exception as e:
+        logger.error(f"Failed to send ready: {e}")
+        camera_pcs[camera_id] = pc
+        relays[camera_id] = MediaRelay()
+
+    @pc.on("icecandidate")
+    async def on_ice(candidate):
+        if candidate:
+            await websocket.send_text(json.dumps({
+                "type": "candidate",
+                "candidate": candidate.to_sdp(),
+                "sdpMid": candidate.sdpMid,
+                "sdpMLineIndex": candidate.sdpMLineIndex
+            }))
 
     @pc.on("track")
     async def on_track(track):
@@ -66,37 +81,40 @@ async def camera_endpoint(websocket: WebSocket, camera_id: str):
 
     try:
         while True:
-            raw = await websocket.receive_text()
-            msg = json.loads(raw)
+            try:
+                raw = await websocket.receive_text()
+                msg = json.loads(raw)
 
-            if msg["type"] == "offer":
-                # Camera sends offer → backend answers
-                offer = RTCSessionDescription(
-                    sdp=msg["sdp"],
-                    type=msg["type"]
-                )
-                await pc.setRemoteDescription(offer)
-                answer = await pc.createAnswer()
-                await pc.setLocalDescription(answer)
+                if msg["type"] == "offer":
+                    # Camera sends offer → backend answers
+                    offer = RTCSessionDescription(
+                        sdp=msg["sdp"],
+                        type=msg["type"]
+                    )
+                    await pc.setRemoteDescription(offer)
+                    answer = await pc.createAnswer()
+                    await pc.setLocalDescription(answer)
 
-                await websocket.send_text(json.dumps({
-                    "type": pc.localDescription.type,
-                    "sdp": pc.localDescription.sdp
-                }))
+                    await websocket.send_text(json.dumps({
+                        "type": pc.localDescription.type,
+                        "sdp": pc.localDescription.sdp
+                    }))
 
-            elif msg["type"] == "candidate" and msg.get("candidate"):
-                # ICE candidate exchange
-                from aiortc.sdp import candidate_from_sdp
-                candidate = candidate_from_sdp(msg["candidate"])
-                candidate.sdpMid = msg.get("sdpMid", "0")
-                candidate.sdpMLineIndex = msg.get("sdpMLineIndex", 0)
-                await pc.addIceCandidate(candidate)
+                elif msg["type"] == "candidate" and msg.get("candidate"):
+                    # ICE candidate exchange
+                    from aiortc.sdp import candidate_from_sdp
+                    candidate = candidate_from_sdp(msg["candidate"])
+                    candidate.sdpMid = msg.get("sdpMid", "0")
+                    candidate.sdpMLineIndex = msg.get("sdpMLineIndex", 0)
+                    await pc.addIceCandidate(candidate)
 
-    except WebSocketDisconnect:
-        await cleanup_pc(pc, camera_id, "camera")
+            except WebSocketDisconnect:
+                break
+
     except Exception as e:
         logger.error(f"Camera WS error: {e}")
-        await cleanup_pc(pc, camera_id, "camera")
+    finally:
+        logger.info(f"Camera websocket closed for {camera_id}")
 
 
 @router.websocket("/ws/monitor/{camera_id}")
@@ -105,12 +123,22 @@ async def monitor_endpoint(websocket: WebSocket, camera_id: str):
     Monitor device connects here.
     Receives the relayed stream from the camera.
     """
-    await websocket.accept()
+        
     pc = RTCPeerConnection()
 
     if camera_id not in monitor_pcs:
         monitor_pcs[camera_id] = set()
     monitor_pcs[camera_id].add(pc)
+
+    @pc.on("icecandidate")
+    async def on_ice(candidate):
+        if candidate:
+            await websocket.send_text(json.dumps({
+                "type": "candidate",
+                "candidate": candidate.to_sdp(),
+                "sdpMid": candidate.sdpMid,
+                "sdpMLineIndex": candidate.sdpMLineIndex
+            }))
 
     @pc.on("connectionstatechange")
     async def on_state_change():
@@ -119,7 +147,12 @@ async def monitor_endpoint(websocket: WebSocket, camera_id: str):
             await cleanup_pc(pc, camera_id, "monitor")
 
     try:
-        # Check if camera stream is available
+        # Wait for camera stream
+        for _ in range(20):  # wait up to 10 seconds
+            if camera_id in relays and camera_id in camera_tracks:
+                break
+            await asyncio.sleep(0.5)
+
         if camera_id not in relays or camera_id not in camera_tracks:
             await websocket.send_text(json.dumps({
                 "type": "error",
@@ -156,7 +189,7 @@ async def monitor_endpoint(websocket: WebSocket, camera_id: str):
                 await pc.addIceCandidate(candidate)
 
     except WebSocketDisconnect:
-        await cleanup_pc(pc, camera_id, "monitor")
+        logger.info("Monitor websocket disconnected")
     except Exception as e:
         logger.error(f"Monitor WS error: {e}")
         await cleanup_pc(pc, camera_id, "monitor")
