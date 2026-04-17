@@ -243,6 +243,7 @@ export const cameraAPI = {
     selected_camera: number;
     type?: string;
     location?: string;
+    config?: Record<string, any>;
   }) => {
     const response = await fetchWithNgrok(`${CAMERA_API_URL}/register`, {
       method: "POST",
@@ -280,6 +281,34 @@ export const cameraAPI = {
 
     if (!response.ok) {
       let message = "Failed to update camera stream state";
+      try {
+        const error = await response.json();
+        message = error.detail || error.message || message;
+      } catch {
+        // Ignore non-JSON error bodies and keep fallback message.
+      }
+      throw new Error(message);
+    }
+
+    return response.json();
+  },
+
+  updateCameraConfig: async (token: string, cameraId: string, config: Record<string, any>) => {
+    const response = await fetchWithNgrok(`${CAMERA_API_URL}/${cameraId}/config`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ config }),
+    });
+
+    if (response.status === 401) {
+      throw new Error("Unauthorized");
+    }
+
+    if (!response.ok) {
+      let message = "Failed to update camera config";
       try {
         const error = await response.json();
         message = error.detail || error.message || message;

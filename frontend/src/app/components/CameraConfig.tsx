@@ -5,12 +5,46 @@ import { useCameras } from "../context/CameraContext";
 
 export function CameraConfig() {
   const { darkMode } = useSharedDarkMode();
-  const { cameras, deleteCamera, setCameraStreamState } = useCameras();
+  const { cameras, deleteCamera, setCameraStreamState, setCameraConfig } = useCameras();
   const [expandedCamera, setExpandedCamera] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
   const [pendingStreamCameraId, setPendingStreamCameraId] = useState<string | null>(null);
+  const [pendingAiToggle, setPendingAiToggle] = useState<string | null>(null);
   const isStreamEnabled = (camera: typeof cameras[number]) =>
     camera.stream_enabled ?? camera.status === "online";
+  const aiToggleOrder = [
+    { key: "intrusion", label: "Intrusion" },
+    { key: "crowd", label: "Crowd" },
+    { key: "vehicle", label: "Vehicle" },
+    { key: "threat", label: "Threat" },
+    { key: "motion", label: "Motion" },
+    { key: "loiter", label: "Loitering" },
+    { key: "emergency", label: "Emergency" },
+    { key: "face_recognition", label: "Face Recognition" },
+    { key: "screenshot", label: "Screenshot" },
+  ] as const;
+
+  const getCameraAiToggles = (camera: typeof cameras[number]) => {
+    const defaults = {
+      intrusion: true,
+      crowd: true,
+      vehicle: true,
+      threat: true,
+      motion: true,
+      loiter: true,
+      emergency: true,
+      face_recognition: true,
+      screenshot: false,
+    };
+    const aiToggles = (camera.config as any)?.ai_toggles;
+    if (!aiToggles || typeof aiToggles !== "object") {
+      return defaults;
+    }
+    return {
+      ...defaults,
+      ...aiToggles,
+    };
+  };
 
   const activeCount = useMemo(
     () => cameras.filter((camera) => isStreamEnabled(camera)).length,
@@ -34,6 +68,24 @@ export function CameraConfig() {
       setExpandedCamera(null);
     }
     setShowDeleteModal(null);
+  };
+
+  const handleAiToggle = async (camera: typeof cameras[number], key: string, enabled: boolean) => {
+    const toggleId = `${camera.id}:${key}`;
+    setPendingAiToggle(toggleId);
+    try {
+      const currentConfig = (camera.config && typeof camera.config === "object") ? camera.config : {};
+      const currentToggles = getCameraAiToggles(camera);
+      await setCameraConfig(camera.id, {
+        ...currentConfig,
+        ai_toggles: {
+          ...currentToggles,
+          [key]: enabled,
+        },
+      });
+    } finally {
+      setPendingAiToggle(null);
+    }
   };
 
   return (
@@ -60,8 +112,16 @@ export function CameraConfig() {
         <div className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
           {cameras.map((camera) => (
             <div key={camera.id} className={`${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => setExpandedCamera(expandedCamera === camera.id ? null : camera.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setExpandedCamera(expandedCamera === camera.id ? null : camera.id);
+                  }
+                }}
                 className={`w-full px-6 py-4 flex items-center justify-between transition-colors ${
                   darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
                 }`}
@@ -91,7 +151,7 @@ export function CameraConfig() {
                     <ChevronDown size={20} className={darkMode ? "text-gray-400" : "text-gray-400"} />
                   )}
                 </div>
-              </button>
+              </div>
               
               {expandedCamera === camera.id && (
                 <div className={`px-6 py-6 border-t ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
@@ -166,6 +226,49 @@ export function CameraConfig() {
                               ? "Stop Stream"
                               : "Start Stream"}
                         </button>
+                      </div>
+                    </div>
+
+                    <div className={`mb-6 rounded-lg p-4 border ${
+                      darkMode ? 'border-gray-600 bg-gray-800' : 'border-gray-200 bg-white'
+                    }`}>
+                      <div className="mb-3">
+                        <h4 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>AI Detection Controls</h4>
+                        <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          These are synced to this camera config and shared with camera app Live.
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {aiToggleOrder.map((item) => {
+                          const toggles = getCameraAiToggles(camera);
+                          const checked = Boolean((toggles as any)[item.key]);
+                          const pending = pendingAiToggle === `${camera.id}:${item.key}`;
+                          return (
+                            <div
+                              key={`${camera.id}-${item.key}`}
+                              className={`flex items-center justify-between p-3 rounded-lg border ${
+                                darkMode ? "border-gray-600 bg-gray-700" : "border-gray-200 bg-gray-50"
+                              }`}
+                            >
+                              <span className={`text-sm font-medium ${darkMode ? "text-white" : "text-gray-900"}`}>
+                                {item.label}
+                              </span>
+                              <button
+                                onClick={() => handleAiToggle(camera, item.key, !checked)}
+                                disabled={pending}
+                                className={`w-12 h-6 rounded-full transition-colors disabled:opacity-60 ${
+                                  checked ? "bg-blue-600" : "bg-gray-300"
+                                }`}
+                              >
+                                <div
+                                  className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${
+                                    checked ? "translate-x-6" : "translate-x-0.5"
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 

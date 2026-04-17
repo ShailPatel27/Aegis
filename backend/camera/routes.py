@@ -15,10 +15,14 @@ class CameraRegister(BaseModel):
     selected_camera: int
     type: Optional[str] = "webcam"
     location: Optional[str] = None
+    config: Optional[dict] = None
 
 
 class CameraStreamToggle(BaseModel):
     enabled: bool
+
+class CameraConfigUpdate(BaseModel):
+    config: dict
 
 
 def is_stream_enabled(camera: dict) -> bool:
@@ -54,6 +58,7 @@ async def register_camera(
             "selected_camera": camera.selected_camera,
             "type": camera.type,
             "location": camera.location,
+            "config": camera.config or {},
             "status": "online",
             "created_at": datetime.utcnow().isoformat(),
         }
@@ -123,6 +128,47 @@ async def set_camera_stream_state(
         supabase.table("cameras") \
             .update({
                 "status": "online" if payload.enabled else "offline",
+            }) \
+            .eq("id", camera_id) \
+            .eq("user_id", user["id"]) \
+            .execute()
+
+        camera_response = (
+            supabase.table("cameras")
+            .select("*")
+            .eq("id", camera_id)
+            .eq("user_id", user["id"])
+            .single()
+            .execute()
+        )
+
+        if not camera_response.data:
+            raise HTTPException(status_code=404, detail="Camera not found")
+
+        return {
+            "success": True,
+            "camera": {
+                **camera_response.data,
+                "stream_enabled": is_stream_enabled(camera_response.data),
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.patch("/{camera_id}/config")
+async def update_camera_config(
+    camera_id: str,
+    payload: CameraConfigUpdate,
+    user=Depends(get_current_user),
+):
+    try:
+        supabase.table("cameras") \
+            .update({
+                "config": payload.config,
+                "updated_at": datetime.utcnow().isoformat(),
             }) \
             .eq("id", camera_id) \
             .eq("user_id", user["id"]) \

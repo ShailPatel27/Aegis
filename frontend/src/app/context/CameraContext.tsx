@@ -9,6 +9,7 @@ type Camera = {
   stream_enabled?: boolean;
   location?: string | null;
   type?: string;
+  config?: Record<string, any>;
   created_at: string;
   last_seen?: string;
 };
@@ -23,6 +24,7 @@ type CameraContextType = {
   refreshCameras: () => Promise<void>;
   deleteCamera: (id: string) => Promise<void>;
   setCameraStreamState: (id: string, enabled: boolean) => Promise<void>;
+  setCameraConfig: (id: string, config: Record<string, any>) => Promise<void>;
   getStream: (cameraIndex: number) => Promise<MediaStream | null>;
   releaseStream: (cameraIndex: number) => void;
 };
@@ -98,6 +100,21 @@ export function CameraProvider({ children }: { children: ReactNode }) {
     }
   }, [clearSession, refreshCameras]);
 
+  const setCameraConfig = useCallback(async (id: string, config: Record<string, any>) => {
+    const token = tokenManager.getToken();
+    if (!token) return;
+    try {
+      await cameraAPI.updateCameraConfig(token, id, config);
+      await refreshCameras();
+    } catch (error) {
+      if (error instanceof Error && error.message === "Unauthorized") {
+        clearSession();
+        return;
+      }
+      throw error;
+    }
+  }, [clearSession, refreshCameras]);
+
   // Shared stream — if two components need same index, reuse same MediaStream
   const getStream = useCallback(async (cameraIndex: number): Promise<MediaStream | null> => {
     const existing = streams.current.get(cameraIndex);
@@ -149,7 +166,7 @@ export function CameraProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <CameraContext.Provider value={{ cameras, refreshCameras, deleteCamera, setCameraStreamState, getStream, releaseStream }}>
+    <CameraContext.Provider value={{ cameras, refreshCameras, deleteCamera, setCameraStreamState, setCameraConfig, getStream, releaseStream }}>
       {children}
     </CameraContext.Provider>
   );
