@@ -1,6 +1,6 @@
 export const BACKEND_BASE_URL =
   import.meta.env.VITE_BACKEND_URL ||
-  `https://your-ngrok-subdomain.ngrok.io`;
+  "https://matriarch-unicycle-upfront.ngrok-free.dev";
 
 const API_BASE_URL = `${BACKEND_BASE_URL}/api/v1`;
 const CAMERA_API_URL = `${BACKEND_BASE_URL}/api/cameras`;

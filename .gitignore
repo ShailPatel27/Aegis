@@ -102,6 +102,7 @@ temp/
 *.njsproj
 *.sln
 *.sw?
+*.windsurf/
 
 # Local configuration files
 config/local.json

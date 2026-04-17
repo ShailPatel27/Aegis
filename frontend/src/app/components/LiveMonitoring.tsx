@@ -150,29 +150,6 @@ export function LiveMonitoring() {
         <div className="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-mono">
           {new Date().toLocaleTimeString()}
         </div>
-
-        {/* Detection Boxes (only on main view) */}
-        {isMain && objectDetection && (
-          <>
-            <div className="absolute top-1/3 left-1/4 w-32 h-40 border-2 border-green-400 rounded">
-              <div className="absolute -top-7 left-0 bg-green-400 text-white text-xs px-2 py-1 rounded">
-                Person #001 • 98%
-              </div>
-            </div>
-            <div className="absolute bottom-1/4 right-1/3 w-28 h-36 border-2 border-blue-400 rounded">
-              <div className="absolute -top-7 left-0 bg-blue-400 text-white text-xs px-2 py-1 rounded">
-                Person #002 • 95%
-              </div>
-            </div>
-            {faceRecognition && (
-              <div className="absolute top-1/2 left-1/2 w-20 h-24 border-2 border-yellow-400 rounded">
-                <div className="absolute -top-7 left-0 bg-yellow-400 text-gray-900 text-xs px-2 py-1 rounded whitespace-nowrap">
-                  John Doe • Whitelist
-                </div>
-              </div>
-            )}
-          </>
-        )}
       </div>
     );
   }
