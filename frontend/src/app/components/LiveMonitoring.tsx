@@ -3,6 +3,7 @@ import { Camera, Circle, Grid3x3, Monitor, ChevronLeft, ChevronRight, Maximize2,
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { useCameras } from "../context/CameraContext";
 import { useLocation } from "react-router";
+import { cameraAPI, tokenManager } from "../services/api";
 
 const mockEvents = [
   { id: 1, type: "Person", confidence: "98%", time: "14:32:45", img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&q=80" },
@@ -75,13 +76,132 @@ function LocalCameraPreview({
   );
 }
 
-function ChunkPlaybackPlaceholder({ className = "w-full h-full" }: { className?: string }) {
+function ChunkPlaybackPlayer({
+  cameraId,
+  streamEnabled,
+  className = "w-full h-full",
+}: {
+  cameraId: string;
+  streamEnabled: boolean;
+  className?: string;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const lastTsRef = useRef<number>(0);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    let timer: number | undefined;
+
+    const poll = async () => {
+      if (!streamEnabled) {
+        if (mounted) {
+          setLoading(false);
+          setError(null);
+        }
+        timer = window.setTimeout(poll, 2000);
+        return;
+      }
+
+      const token = tokenManager.getToken();
+      if (!token) {
+        if (mounted) {
+          setLoading(false);
+          setError("Not authenticated");
+        }
+        return;
+      }
+
+      try {
+        const response = await cameraAPI.getLatestChunks(token, cameraId, 1);
+        const latest = Array.isArray(response?.chunks) ? response.chunks[0] : null;
+        const nextUrl = latest?.url || null;
+        const nextTs = Number(latest?.timestamp || 0);
+
+        if (!mounted) return;
+
+        if (nextUrl && nextTs > 0 && nextTs !== lastTsRef.current) {
+          setVideoUrl(nextUrl);
+          lastTsRef.current = nextTs;
+        }
+        setError(null);
+        setLoading(false);
+      } catch {
+        if (!mounted) return;
+        setLoading(false);
+        setError("Waiting for chunks...");
+      } finally {
+        timer = window.setTimeout(poll, 1500);
+      }
+    };
+
+    setVideoUrl(null);
+    lastTsRef.current = 0;
+    setLoading(true);
+    setError(null);
+    poll();
+
+    return () => {
+      mounted = false;
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [cameraId, streamEnabled]);
+
+  useEffect(() => {
+    if (!videoRef.current || !videoUrl) return;
+    videoRef.current.src = videoUrl;
+    videoRef.current
+      .play()
+      .catch(() => {
+        // Autoplay may be blocked until user gesture on some browsers.
+      });
+  }, [videoUrl]);
+
+  if (!streamEnabled) {
+    return (
+      <div className={`${className} flex flex-col items-center justify-center bg-gray-900 text-gray-500 min-h-[180px]`}>
+        <Archive size={36} className="mb-2 opacity-60" />
+        <p className="text-sm">Camera is offline</p>
+      </div>
+    );
+  }
+
+  if (loading && !videoUrl) {
+    return (
+      <div className={`${className} flex flex-col items-center justify-center bg-gray-900 text-gray-500 min-h-[180px]`}>
+        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
+        <p className="text-sm">Waiting for first chunk...</p>
+      </div>
+    );
+  }
+
+  if (!videoUrl) {
+    return (
+      <div className={`${className} flex flex-col items-center justify-center bg-gray-900 text-gray-500 min-h-[180px]`}>
+        <Archive size={36} className="mb-2 opacity-60" />
+        <p className="text-sm">{error || "No chunk available yet"}</p>
+      </div>
+    );
+  }
+
   return (
-    <div className={`${className} flex flex-col items-center justify-center bg-gray-900 text-gray-500 min-h-[180px]`}>
-      <Archive size={36} className="mb-2 opacity-60" />
-      <p className="text-sm">Live stream removed</p>
-      <p className="text-xs mt-1">Chunk playback from Supabase will be used</p>
-    </div>
+    <video
+      ref={videoRef}
+      autoPlay
+      muted
+      playsInline
+      controls={false}
+      className={className}
+      onEnded={() => {
+        if (videoRef.current) {
+          videoRef.current.play().catch(() => {});
+        }
+      }}
+    />
   );
 }
 
@@ -138,7 +258,11 @@ export function LiveMonitoring() {
             className="w-full h-full object-cover opacity-90"
           />
         ) : (
-          <ChunkPlaybackPlaceholder className="w-full h-full" />
+          <ChunkPlaybackPlayer
+            cameraId={camera.id}
+            streamEnabled={camera.stream_enabled !== false}
+            className="w-full h-full object-cover"
+          />
         )}
 
         {/* Live Indicator */}

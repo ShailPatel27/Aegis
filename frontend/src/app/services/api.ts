@@ -338,6 +338,31 @@ export const cameraAPI = {
     }
 
     return response.json();
+  },
+
+  getLatestChunks: async (token: string, cameraId: string, limit: number = 1) => {
+    const response = await fetchWithNgrok(
+      `${CAMERA_API_URL}/${cameraId}/chunks/latest?limit=${encodeURIComponent(limit)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (response.status === 401) {
+      throw new Error("Unauthorized");
+    }
+    if (response.status === 404) {
+      // Backend may still be running old routes; treat as no chunks for now.
+      return { success: false, camera_id: cameraId, chunks: [] };
+    }
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch latest chunks");
+    }
+
+    return response.json();
   }
 };
 

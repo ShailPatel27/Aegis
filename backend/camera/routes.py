@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from io import BytesIO
 from typing import Optional
 from uuid import uuid4
 from datetime import datetime
+import re
 from pydantic import BaseModel
 from supabase import create_client
 
@@ -72,13 +73,47 @@ def _provision_camera_storage(camera_id: str) -> None:
 
     try:
         storage.from_(bucket_name).upload(
-            "stream-chunks/.keep",
-            BytesIO(b""),
+            "stream-chunks/_init.txt",
+            BytesIO(b"stream-chunks initialized"),
             {"content-type": "application/octet-stream", "upsert": "true"},
         )
     except Exception as exc:
         # Folder marker is optional.
         print(f"[camera-storage] marker upload skipped for {bucket_name}: {exc}")
+
+
+def _extract_chunk_timestamp(name: str) -> int:
+    match = re.match(r"^chunk_(\d+)\.mp4$", name or "")
+    if not match:
+        return 0
+    return int(match.group(1))
+
+
+def _public_or_signed_url(storage, bucket_name: str, chunk_path: str) -> Optional[str]:
+    try:
+        public_url = storage.from_(bucket_name).get_public_url(chunk_path)
+        if isinstance(public_url, str):
+            return public_url
+        if isinstance(public_url, dict):
+            return (
+                public_url.get("publicURL")
+                or public_url.get("publicUrl")
+                or public_url.get("public_url")
+            )
+    except Exception:
+        pass
+
+    try:
+        signed = storage.from_(bucket_name).create_signed_url(chunk_path, 60)
+        if isinstance(signed, dict):
+            url = signed.get("signedURL") or signed.get("signedUrl")
+            if isinstance(url, str) and url.startswith("http"):
+                return url
+            if isinstance(url, str) and settings.SUPABASE_URL:
+                return f"{settings.SUPABASE_URL}{url}"
+    except Exception:
+        pass
+    return None
 
 @router.post("/register")
 async def register_camera(
@@ -206,6 +241,79 @@ async def set_camera_stream_state(
             },
         }
 
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{camera_id}/chunks/latest")
+async def get_latest_chunks(
+    camera_id: str,
+    limit: int = Query(default=1, ge=1, le=20),
+    user=Depends(get_current_user),
+):
+    try:
+        camera_response = (
+            supabase.table("cameras")
+            .select("id")
+            .eq("id", camera_id)
+            .eq("user_id", user["id"])
+            .single()
+            .execute()
+        )
+        if not camera_response.data:
+            raise HTTPException(status_code=404, detail="Camera not found")
+
+        bucket_name = _bucket_name_from_camera_id(camera_id)
+        if not bucket_name:
+            return {"success": True, "camera_id": camera_id, "chunks": []}
+
+        storage_client = admin_supabase if admin_supabase is not None else supabase
+        storage = storage_client.storage
+        try:
+            entries = storage.from_(bucket_name).list(
+                "stream-chunks",
+                {"limit": 500, "offset": 0, "sortBy": {"column": "name", "order": "desc"}},
+            )
+        except Exception:
+            entries = []
+
+        if not isinstance(entries, list):
+            entries = []
+
+        chunk_entries = []
+        for item in entries:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "")
+            ts = _extract_chunk_timestamp(name)
+            if ts <= 0:
+                continue
+            chunk_entries.append((ts, name))
+
+        chunk_entries.sort(key=lambda x: x[0], reverse=True)
+        selected = chunk_entries[:limit]
+
+        chunks = []
+        for ts, name in selected:
+            chunk_path = f"stream-chunks/{name}"
+            url = _public_or_signed_url(storage, bucket_name, chunk_path)
+            chunks.append(
+                {
+                    "name": name,
+                    "path": chunk_path,
+                    "timestamp": ts,
+                    "url": url,
+                }
+            )
+
+        return {
+            "success": True,
+            "camera_id": camera_id,
+            "bucket": bucket_name,
+            "chunks": chunks,
+        }
     except HTTPException:
         raise
     except Exception as e:
