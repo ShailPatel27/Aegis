@@ -79,17 +79,32 @@ function LocalCameraPreview({
 function ChunkPlaybackPlayer({
   cameraId,
   streamEnabled,
+  feedPaused,
   className = "w-full h-full",
 }: {
   cameraId: string;
   streamEnabled: boolean;
+  feedPaused: boolean;
   className?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const lastTsRef = useRef<number>(0);
+  const activeTsRef = useRef<number>(0);
+  const pendingRef = useRef<{ url: string; ts: number } | null>(null);
+  const lastChunkSeenAtRef = useRef<number>(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLiveFollow, setIsLiveFollow] = useState(true);
+
+  const CHUNK_STALE_MS = 7000;
+
+  const swapToPending = () => {
+    const next = pendingRef.current;
+    if (!next) return;
+    pendingRef.current = null;
+    activeTsRef.current = next.ts;
+    setVideoUrl(next.url);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -98,10 +113,22 @@ function ChunkPlaybackPlayer({
     const poll = async () => {
       if (!streamEnabled) {
         if (mounted) {
+          activeTsRef.current = 0;
+          pendingRef.current = null;
+          lastChunkSeenAtRef.current = 0;
+          setVideoUrl(null);
           setLoading(false);
-          setError(null);
+          setError("Feed stopped. Camera is offline.");
         }
-        timer = window.setTimeout(poll, 2000);
+        return;
+      }
+
+      if (feedPaused) {
+        if (mounted) {
+          setLoading(false);
+          setError("Feed paused from camera.");
+        }
+        timer = window.setTimeout(poll, 1200);
         return;
       }
 
@@ -122,11 +149,35 @@ function ChunkPlaybackPlayer({
 
         if (!mounted) return;
 
-        if (nextUrl && nextTs > 0 && nextTs !== lastTsRef.current) {
-          setVideoUrl(nextUrl);
-          lastTsRef.current = nextTs;
+        if (nextUrl && nextTs > 0) {
+          lastChunkSeenAtRef.current = Date.now();
+          if (activeTsRef.current <= 0) {
+            activeTsRef.current = nextTs;
+            setVideoUrl(nextUrl);
+          } else if (nextTs > activeTsRef.current) {
+            pendingRef.current = { url: nextUrl, ts: nextTs };
+            // If user wants "live" and video is currently ended/stalled, jump immediately.
+            const video = videoRef.current;
+            if (
+              isLiveFollow &&
+              video &&
+              (video.ended || video.readyState < 2 || (video.duration > 0 && video.currentTime >= video.duration - 0.01))
+            ) {
+              swapToPending();
+            }
+          }
+        } else if (
+          lastChunkSeenAtRef.current > 0 &&
+          Date.now() - lastChunkSeenAtRef.current > CHUNK_STALE_MS
+        ) {
+          setVideoUrl(null);
+          setError("No fresh chunks from camera.");
         }
-        setError(null);
+        if (!nextUrl && !error) {
+          setError("Waiting for chunks...");
+        } else if (nextUrl) {
+          setError(null);
+        }
         setLoading(false);
       } catch {
         if (!mounted) return;
@@ -138,7 +189,9 @@ function ChunkPlaybackPlayer({
     };
 
     setVideoUrl(null);
-    lastTsRef.current = 0;
+    activeTsRef.current = 0;
+    pendingRef.current = null;
+    lastChunkSeenAtRef.current = 0;
     setLoading(true);
     setError(null);
     poll();
@@ -149,23 +202,42 @@ function ChunkPlaybackPlayer({
         window.clearTimeout(timer);
       }
     };
-  }, [cameraId, streamEnabled]);
+  }, [cameraId, streamEnabled, feedPaused, isLiveFollow]);
 
   useEffect(() => {
     if (!videoRef.current || !videoUrl) return;
+    if (!streamEnabled || feedPaused) return;
     videoRef.current.src = videoUrl;
+    videoRef.current.load();
     videoRef.current
       .play()
       .catch(() => {
         // Autoplay may be blocked until user gesture on some browsers.
       });
-  }, [videoUrl]);
+  }, [videoUrl, streamEnabled, feedPaused]);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+    if (feedPaused || !streamEnabled) {
+      videoRef.current.pause();
+    }
+  }, [feedPaused, streamEnabled]);
 
   if (!streamEnabled) {
     return (
       <div className={`${className} flex flex-col items-center justify-center bg-gray-900 text-gray-500 min-h-[180px]`}>
         <Archive size={36} className="mb-2 opacity-60" />
-        <p className="text-sm">Camera is offline</p>
+        <p className="text-sm">Feed stopped. Camera is offline.</p>
+      </div>
+    );
+  }
+
+  if (feedPaused) {
+    return (
+      <div className={`${className} flex flex-col items-center justify-center bg-gray-900 text-gray-500 min-h-[180px]`}>
+        <Archive size={36} className="mb-2 opacity-60" />
+        <p className="text-sm">Feed is paused.</p>
+        <p className="text-xs mt-1">Resume from camera controls to continue.</p>
       </div>
     );
   }
@@ -189,19 +261,34 @@ function ChunkPlaybackPlayer({
   }
 
   return (
-    <video
-      ref={videoRef}
-      autoPlay
-      muted
-      playsInline
-      controls={false}
-      className={className}
-      onEnded={() => {
-        if (videoRef.current) {
-          videoRef.current.play().catch(() => {});
-        }
-      }}
-    />
+    <div className="relative w-full h-full">
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        controls
+        className={className}
+        onEnded={() => {
+          if (isLiveFollow) {
+            swapToPending();
+          }
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => {
+          setIsLiveFollow(true);
+          swapToPending();
+          if (videoRef.current) {
+            videoRef.current.play().catch(() => {});
+          }
+        }}
+        className="absolute bottom-2 right-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1 rounded"
+      >
+        LIVE
+      </button>
+    </div>
   );
 }
 
@@ -258,18 +345,38 @@ export function LiveMonitoring() {
             className="w-full h-full object-cover opacity-90"
           />
         ) : (
+          (() => {
+            const feedPaused = Boolean(camera?.config?.feed_paused);
+            const streamEnabled = camera?.stream_enabled === true || camera?.status === "online";
+            return (
           <ChunkPlaybackPlayer
             cameraId={camera.id}
-            streamEnabled={camera.stream_enabled !== false}
+            streamEnabled={streamEnabled}
+            feedPaused={feedPaused}
             className="w-full h-full object-cover"
           />
+            );
+          })()
         )}
 
         {/* Live Indicator */}
-        <div className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-          <Circle className="w-1.5 h-1.5 fill-white animate-pulse" />
-          LIVE
-        </div>
+        {(() => {
+          const feedPaused = Boolean(camera?.config?.feed_paused);
+          const streamEnabled = camera?.stream_enabled === true || camera?.status === "online";
+          const isLive = streamEnabled && !feedPaused;
+          const label = !streamEnabled ? "STOPPED" : feedPaused ? "PAUSED" : "LIVE";
+          const badge = !streamEnabled
+            ? "bg-slate-600"
+            : feedPaused
+              ? "bg-yellow-600"
+              : "bg-red-600";
+          return (
+            <div className={`absolute top-2 left-2 ${badge} text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1`}>
+              <Circle className={`w-1.5 h-1.5 fill-white ${isLive ? "animate-pulse" : ""}`} />
+              {label}
+            </div>
+          );
+        })()}
 
         {/* Camera Info */}
         <div className="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
