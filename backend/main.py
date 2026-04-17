@@ -7,14 +7,10 @@ import socket
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
 import uvicorn
 
 from auth.routes import router as auth_router
 from camera.routes import router as camera_router
-from camera.status import start_status_monitor
-from camera.stream import router as camera_stream_router
-from camera.webrtc import router as webrtc_router
 from config.settings import settings
 
 
@@ -47,8 +43,6 @@ def get_available_port() -> int:
 async def lifespan(app: FastAPI):
     print("AEGIS Backend Started Successfully")
 
-    start_status_monitor()
-
     yield
 
     print("AEGIS Backend Shutting Down")
@@ -70,23 +64,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/api/v1")
-app.include_router(camera_stream_router, prefix="/api/camera")
 app.include_router(camera_router, prefix="/api/cameras")
-app.include_router(webrtc_router, prefix="/api/webrtc")
-
-
-@app.get("/test")
-def test():
-    return HTMLResponse(
-        """
-    <html>
-    <body>
-    <h1>Camera Test</h1>
-    <img src="/api/camera/stream/0" width="640">
-    </body>
-    </html>
-    """
-    )
 
 
 @app.get("/health")

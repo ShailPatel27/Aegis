@@ -1,10 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Wifi, Monitor, Plus, Settings, Eye, AlertTriangle, CameraOff, Play, Pause, Maximize2 } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { useUser } from "../context/UserContext";
 import { useCameras } from "../context/CameraContext";
-import { WebcamPreview } from "./ui/WebcamPreview";
-import { WebRTCMonitorView } from "./WebRTCMonitorView";
 
 
 type CameraDevice = {
@@ -129,7 +127,11 @@ export function MonitorDashboard() {
             <div className="relative bg-black aspect-video">
               {camera.status === 'online' ? (
                 <>
-                  <WebRTCMonitorView cameraId={camera.id} />
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 text-gray-500 min-h-[180px]">
+                    <CameraOff size={40} className="mb-2 opacity-40" />
+                    <p className="text-sm">Live stream removed</p>
+                    <p className="text-xs mt-1">Supabase chunk playback will be used</p>
+                  </div>
                   <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">

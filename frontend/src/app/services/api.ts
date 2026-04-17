@@ -1,18 +1,12 @@
 export const BACKEND_BASE_URL =
   import.meta.env.VITE_BACKEND_URL ||
-  "https://matriarch-unicycle-upfront.ngrok-free.dev";
+  "http://localhost:8000";
 
 const API_BASE_URL = `${BACKEND_BASE_URL}/api/v1`;
 const CAMERA_API_URL = `${BACKEND_BASE_URL}/api/cameras`;
 
 const fetchWithNgrok = (url: string, options: RequestInit = {}) => {
-  return fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      ...(BACKEND_BASE_URL.includes('ngrok') ? { 'ngrok-skip-browser-warning': 'true' } : {})
-    }
-  });
+  return fetch(url, options);
 };
 
 // fetch(`${CAMERA_API_URL}`)

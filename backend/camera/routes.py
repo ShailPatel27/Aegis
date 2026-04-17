@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from auth.dependencies import get_current_user
 from database.supabase import supabase
 from camera.device import get_device_id
-from camera.heartbeat import start_heartbeat
 
 router = APIRouter(tags=["Cameras"])
 
@@ -60,7 +59,6 @@ async def register_camera(
         }
 
         response = supabase.table("cameras").insert(data).execute()
-        start_heartbeat(data["id"], user["id"])
 
         return {
             "success": True,
@@ -114,24 +112,6 @@ async def delete_camera(camera_id: str, user=Depends(get_current_user)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/heartbeat/{camera_id}")
-async def camera_heartbeat(camera_id: str, user=Depends(get_current_user)):
-    try:
-        supabase.table("cameras") \
-            .update({
-                "status": "online",
-                "last_seen": datetime.utcnow().isoformat()
-            }) \
-            .eq("id", camera_id) \
-            .eq("user_id", user["id"]) \
-            .execute()
-
-        return {"success": True}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.patch("/{camera_id}/stream")
 async def set_camera_stream_state(

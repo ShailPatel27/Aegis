@@ -4,8 +4,6 @@ import { useUser } from "../context/UserContext";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { UserProfile } from "./UserProfile";
 import { CameraProvider } from "../context/CameraContext";
-import { useCameras } from "../context/CameraContext";
-import { useCameraStream } from "../hooks/useWebRTC";
 import { Home, Camera, Users, Bell, BarChart3, Settings, Menu, LogOut, Sun, Moon, User, Video, AlertTriangle, Cog, Monitor } from "lucide-react";
 
 // Camera-specific navigation
@@ -27,66 +25,6 @@ const monitorNavItems = [
   { path: "/monitor/camera-config", label: "Camera Configuration", icon: Cog },
   { path: "/monitor/settings", label: "Settings", icon: Settings },
 ];
-
-function CameraBackgroundPublisher() {
-  const { cameras, getStream, releaseStream } = useCameras();
-
-  return (
-    <>
-      {cameras
-        .filter((camera) => camera.stream_enabled !== false)
-        .map((camera) => (
-          <CameraBroadcastSession
-            key={camera.id}
-            cameraId={camera.id}
-            cameraIndex={camera.selected_camera}
-            getStream={getStream}
-            releaseStream={releaseStream}
-          />
-        ))}
-    </>
-  );
-}
-
-function CameraBroadcastSession({
-  cameraId,
-  cameraIndex,
-  getStream,
-  releaseStream,
-}: {
-  cameraId: string;
-  cameraIndex: number;
-  getStream: (cameraIndex: number) => Promise<MediaStream | null>;
-  releaseStream: (cameraIndex: number) => void;
-}) {
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  useCameraStream(cameraId, localStream);
-
-  useEffect(() => {
-    let isActive = true;
-
-    const loadStream = async () => {
-      const stream = await getStream(cameraIndex);
-      if (!isActive) {
-        if (stream) {
-          releaseStream(cameraIndex);
-        }
-        return;
-      }
-      setLocalStream(stream);
-    };
-
-    loadStream();
-
-    return () => {
-      isActive = false;
-      releaseStream(cameraIndex);
-      setLocalStream(null);
-    };
-  }, [cameraId, cameraIndex, getStream, releaseStream]);
-
-  return null;
-}
 
 export function Layout() {
   const location = useLocation();
@@ -217,7 +155,6 @@ export function Layout() {
           </button>
         )}
         <CameraProvider>
-          <CameraBackgroundPublisher />
           <Outlet />
         </CameraProvider>
       </main>

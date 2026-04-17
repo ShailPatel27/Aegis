@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Camera, Circle, Grid3x3, Monitor, ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
+import { Camera, Circle, Grid3x3, Monitor, ChevronLeft, ChevronRight, Maximize2, Archive } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { useCameras } from "../context/CameraContext";
-import { WebRTCMonitorView } from "./WebRTCMonitorView";
 import { useLocation } from "react-router";
 
 const mockEvents = [
@@ -76,6 +75,16 @@ function LocalCameraPreview({
   );
 }
 
+function ChunkPlaybackPlaceholder({ className = "w-full h-full" }: { className?: string }) {
+  return (
+    <div className={`${className} flex flex-col items-center justify-center bg-gray-900 text-gray-500 min-h-[180px]`}>
+      <Archive size={36} className="mb-2 opacity-60" />
+      <p className="text-sm">Live stream removed</p>
+      <p className="text-xs mt-1">Chunk playback from Supabase will be used</p>
+    </div>
+  );
+}
+
 export function LiveMonitoring() {
   const { darkMode } = useSharedDarkMode();
   const { cameras } = useCameras();
@@ -129,10 +138,7 @@ export function LiveMonitoring() {
             className="w-full h-full object-cover opacity-90"
           />
         ) : (
-          <WebRTCMonitorView
-            cameraId={camera.id}
-            className="w-full h-full object-cover opacity-70"
-          />
+          <ChunkPlaybackPlaceholder className="w-full h-full" />
         )}
 
         {/* Live Indicator */}
