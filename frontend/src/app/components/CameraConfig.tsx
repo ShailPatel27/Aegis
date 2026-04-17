@@ -12,6 +12,8 @@ export function CameraConfig() {
   const [pendingAiToggle, setPendingAiToggle] = useState<string | null>(null);
   const isStreamEnabled = (camera: typeof cameras[number]) =>
     camera.stream_enabled ?? camera.status === "online";
+  const isCameraPaused = (camera: typeof cameras[number]) =>
+    Boolean((camera.config as any)?.feed_paused);
   const aiToggleOrder = [
     { key: "intrusion", label: "Intrusion" },
     { key: "crowd", label: "Crowd" },
@@ -57,8 +59,30 @@ export function CameraConfig() {
     try {
       setPendingStreamCameraId(cameraId);
       await setCameraStreamState(cameraId, enabled);
+      const target = cameras.find((camera) => camera.id === cameraId);
+      if (target) {
+        const currentConfig = (target.config && typeof target.config === "object") ? target.config : {};
+        await setCameraConfig(cameraId, {
+          ...currentConfig,
+          feed_paused: false,
+        });
+      }
     } finally {
       setPendingStreamCameraId(null);
+    }
+  };
+
+  const handlePauseResume = async (camera: typeof cameras[number]) => {
+    const toggleId = `${camera.id}:feed_paused`;
+    setPendingAiToggle(toggleId);
+    try {
+      const currentConfig = (camera.config && typeof camera.config === "object") ? camera.config : {};
+      await setCameraConfig(camera.id, {
+        ...currentConfig,
+        feed_paused: !isCameraPaused(camera),
+      });
+    } finally {
+      setPendingAiToggle(null);
     }
   };
 
@@ -207,25 +231,43 @@ export function CameraConfig() {
                         <div>
                           <h4 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Stream Control</h4>
                           <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                            Start or stop this camera stream for monitor clients on the same account.
+                            Control stream state shared with the camera app.
                           </p>
                         </div>
-                        <button
-                          onClick={() => handleToggleStream(camera.id, !isStreamEnabled(camera))}
-                          disabled={pendingStreamCameraId === camera.id}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors disabled:opacity-60 ${
-                            isStreamEnabled(camera)
-                              ? "bg-yellow-600 text-white hover:bg-yellow-700"
-                              : "bg-green-600 text-white hover:bg-green-700"
-                          }`}
-                        >
-                          <Power size={16} />
-                          {pendingStreamCameraId === camera.id
-                            ? "Updating..."
-                            : isStreamEnabled(camera)
-                              ? "Stop Stream"
-                              : "Start Stream"}
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handlePauseResume(camera)}
+                            disabled={!isStreamEnabled(camera) || pendingAiToggle === `${camera.id}:feed_paused`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors disabled:opacity-60 ${
+                              isCameraPaused(camera)
+                                ? "bg-green-600 text-white hover:bg-green-700"
+                                : "bg-yellow-600 text-white hover:bg-yellow-700"
+                            }`}
+                          >
+                            <Power size={16} />
+                            {pendingAiToggle === `${camera.id}:feed_paused`
+                              ? "Updating..."
+                              : isCameraPaused(camera)
+                                ? "Resume"
+                                : "Pause"}
+                          </button>
+                          <button
+                            onClick={() => handleToggleStream(camera.id, !isStreamEnabled(camera))}
+                            disabled={pendingStreamCameraId === camera.id}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors disabled:opacity-60 ${
+                              isStreamEnabled(camera)
+                                ? "bg-red-600 text-white hover:bg-red-700"
+                                : "bg-green-600 text-white hover:bg-green-700"
+                            }`}
+                          >
+                            <Power size={16} />
+                            {pendingStreamCameraId === camera.id
+                              ? "Updating..."
+                              : isStreamEnabled(camera)
+                                ? "Stop Stream"
+                                : "Start Stream"}
+                          </button>
+                        </div>
                       </div>
                     </div>
 

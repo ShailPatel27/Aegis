@@ -1,14 +1,27 @@
 from fastapi import APIRouter, Depends, HTTPException
+from io import BytesIO
 from typing import Optional
 from uuid import uuid4
 from datetime import datetime
 from pydantic import BaseModel
+from supabase import create_client
 
 from auth.dependencies import get_current_user
 from database.supabase import supabase
 from camera.device import get_device_id
+from config.settings import settings
 
 router = APIRouter(tags=["Cameras"])
+
+admin_supabase = None
+if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
+    try:
+        admin_supabase = create_client(
+            settings.SUPABASE_URL,
+            settings.SUPABASE_SERVICE_ROLE_KEY,
+        )
+    except Exception:
+        admin_supabase = None
 
 class CameraRegister(BaseModel):
     name: str
@@ -27,6 +40,45 @@ class CameraConfigUpdate(BaseModel):
 
 def is_stream_enabled(camera: dict) -> bool:
     return camera.get("status") == "online"
+
+
+def _bucket_name_from_camera_id(camera_id: str) -> str:
+    name = (camera_id or "").strip().lower()
+    return "".join(ch if (ch.isalnum() or ch in ("-", "_")) else "-" for ch in name).strip("-")
+
+
+def _provision_camera_storage(camera_id: str) -> None:
+    if admin_supabase is None:
+        # Service-role client not configured; skip bucket provisioning.
+        return
+
+    bucket_name = _bucket_name_from_camera_id(camera_id)
+    if not bucket_name:
+        return
+
+    storage = admin_supabase.storage
+
+    try:
+        storage.create_bucket(
+            bucket_name,
+            name=bucket_name,
+            options={"public": True, "file_size_limit": 52428800},
+        )
+    except Exception as exc:
+        # Ignore "already exists" and continue.
+        if "exists" not in str(exc).lower():
+            print(f"[camera-storage] bucket create failed for {bucket_name}: {exc}")
+            return
+
+    try:
+        storage.from_(bucket_name).upload(
+            "stream-chunks/.keep",
+            BytesIO(b""),
+            {"content-type": "application/octet-stream", "upsert": "true"},
+        )
+    except Exception as exc:
+        # Folder marker is optional.
+        print(f"[camera-storage] marker upload skipped for {bucket_name}: {exc}")
 
 @router.post("/register")
 async def register_camera(
@@ -64,6 +116,7 @@ async def register_camera(
         }
 
         response = supabase.table("cameras").insert(data).execute()
+        _provision_camera_storage(data["id"])
 
         return {
             "success": True,
