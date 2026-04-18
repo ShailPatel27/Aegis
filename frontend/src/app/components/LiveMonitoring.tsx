@@ -88,6 +88,7 @@ function ChunkPlaybackPlayer({
   className?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const preloadVideoRef = useRef<HTMLVideoElement>(null);
   const activeTsRef = useRef<number>(0);
   const pendingRef = useRef<{ url: string; ts: number } | null>(null);
   const lastChunkSeenAtRef = useRef<number>(0);
@@ -142,10 +143,18 @@ function ChunkPlaybackPlayer({
       }
 
       try {
-        const response = await cameraAPI.getLatestChunks(token, cameraId, 1);
-        const latest = Array.isArray(response?.chunks) ? response.chunks[0] : null;
+        const response = await cameraAPI.getLatestChunks(token, cameraId, 5);
+        const chunks = Array.isArray(response?.chunks) ? response.chunks : [];
+        const sorted = chunks
+          .map((c: any) => ({
+            url: c?.url || c?.url_public || null,
+            ts: Number(c?.timestamp || 0),
+          }))
+          .filter((c: any) => Boolean(c.url) && c.ts > 0)
+          .sort((a: any, b: any) => a.ts - b.ts);
+        const latest = sorted.length > 0 ? sorted[sorted.length - 1] : null;
         const nextUrl = latest?.url || null;
-        const nextTs = Number(latest?.timestamp || 0);
+        const nextTs = Number(latest?.ts || 0);
 
         if (!mounted) return;
 
@@ -156,6 +165,11 @@ function ChunkPlaybackPlayer({
             setVideoUrl(nextUrl);
           } else if (nextTs > activeTsRef.current) {
             pendingRef.current = { url: nextUrl, ts: nextTs };
+            // Warm up the next chunk file before boundary switch.
+            if (preloadVideoRef.current) {
+              preloadVideoRef.current.src = nextUrl;
+              preloadVideoRef.current.load();
+            }
             // If user wants "live" and video is currently ended/stalled, jump immediately.
             const video = videoRef.current;
             if (
@@ -274,6 +288,13 @@ function ChunkPlaybackPlayer({
             swapToPending();
           }
         }}
+      />
+      <video
+        ref={preloadVideoRef}
+        muted
+        playsInline
+        preload="auto"
+        className="hidden"
       />
       <button
         type="button"
