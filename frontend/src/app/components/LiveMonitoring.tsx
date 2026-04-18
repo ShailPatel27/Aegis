@@ -91,11 +91,15 @@ function ChunkPlaybackPlayer({
   const preloadVideoRef = useRef<HTMLVideoElement>(null);
   const activeTsRef = useRef<number>(0);
   const pendingRef = useRef<{ url: string; ts: number } | null>(null);
+  const latestChunkRef = useRef<{ url: string; ts: number } | null>(null);
   const lastChunkSeenAtRef = useRef<number>(0);
+  const currentChunkStartMsRef = useRef<number>(0);
+  const liveJumpRequestedRef = useRef<boolean>(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLiveFollow, setIsLiveFollow] = useState(true);
+  const [captureTimeLabel, setCaptureTimeLabel] = useState<string>("--:--:--");
 
   const CHUNK_STALE_MS = 7000;
 
@@ -104,7 +108,36 @@ function ChunkPlaybackPlayer({
     if (!next) return;
     pendingRef.current = null;
     activeTsRef.current = next.ts;
+    currentChunkStartMsRef.current = next.ts * 1000;
     setVideoUrl(next.url);
+  };
+
+  const updateCaptureTimeLabel = () => {
+    const video = videoRef.current;
+    const startMs = currentChunkStartMsRef.current;
+    if (!video || startMs <= 0) {
+      setCaptureTimeLabel("--:--:--");
+      return;
+    }
+    const captureAt = new Date(startMs + Math.max(0, video.currentTime) * 1000);
+    setCaptureTimeLabel(captureAt.toLocaleTimeString());
+  };
+
+  const jumpToLive = () => {
+    setIsLiveFollow(true);
+    const latest = latestChunkRef.current;
+    if (latest && latest.ts > 0 && latest.url) {
+      pendingRef.current = null;
+      activeTsRef.current = latest.ts;
+      currentChunkStartMsRef.current = latest.ts * 1000;
+      liveJumpRequestedRef.current = true;
+      setVideoUrl(latest.url);
+    } else {
+      swapToPending();
+    }
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
   };
 
   useEffect(() => {
@@ -159,9 +192,11 @@ function ChunkPlaybackPlayer({
         if (!mounted) return;
 
         if (nextUrl && nextTs > 0) {
+          latestChunkRef.current = { url: nextUrl, ts: nextTs };
           lastChunkSeenAtRef.current = Date.now();
           if (activeTsRef.current <= 0) {
             activeTsRef.current = nextTs;
+            currentChunkStartMsRef.current = nextTs * 1000;
             setVideoUrl(nextUrl);
           } else if (nextTs > activeTsRef.current) {
             pendingRef.current = { url: nextUrl, ts: nextTs };
@@ -205,7 +240,11 @@ function ChunkPlaybackPlayer({
     setVideoUrl(null);
     activeTsRef.current = 0;
     pendingRef.current = null;
+    latestChunkRef.current = null;
     lastChunkSeenAtRef.current = 0;
+    currentChunkStartMsRef.current = 0;
+    liveJumpRequestedRef.current = false;
+    setCaptureTimeLabel("--:--:--");
     setLoading(true);
     setError(null);
     poll();
@@ -283,6 +322,15 @@ function ChunkPlaybackPlayer({
         playsInline
         controls
         className={className}
+        onLoadedMetadata={() => {
+          const video = videoRef.current;
+          if (video && liveJumpRequestedRef.current && Number.isFinite(video.duration)) {
+            video.currentTime = Math.max(0, video.duration - 0.2);
+            liveJumpRequestedRef.current = false;
+          }
+          updateCaptureTimeLabel();
+        }}
+        onTimeUpdate={updateCaptureTimeLabel}
         onEnded={() => {
           if (isLiveFollow) {
             swapToPending();
@@ -296,19 +344,17 @@ function ChunkPlaybackPlayer({
         preload="auto"
         className="hidden"
       />
-      <button
-        type="button"
-        onClick={() => {
-          setIsLiveFollow(true);
-          swapToPending();
-          if (videoRef.current) {
-            videoRef.current.play().catch(() => {});
-          }
-        }}
-        className="absolute bottom-2 right-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1 rounded"
-      >
-        LIVE
-      </button>
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between bg-black/70 text-white px-2 py-1 rounded text-xs">
+        <span className="font-mono">{captureTimeLabel}</span>
+        <button
+          type="button"
+          title="Jump to latest chunk"
+          onClick={jumpToLive}
+          className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1 rounded"
+        >
+          LIVE
+        </button>
+      </div>
     </div>
   );
 }
@@ -405,9 +451,11 @@ export function LiveMonitoring() {
         </div>
 
         {/* Timestamp */}
-        <div className="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-mono">
-          {new Date().toLocaleTimeString()}
-        </div>
+        {isCameraRoute && (
+          <div className="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-mono">
+            {new Date().toLocaleTimeString()}
+          </div>
+        )}
       </div>
     );
   }
