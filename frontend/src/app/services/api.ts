@@ -5,11 +5,10 @@ export const BACKEND_BASE_URL =
 const API_BASE_URL = `${BACKEND_BASE_URL}/api/v1`;
 const CAMERA_API_URL = `${BACKEND_BASE_URL}/api/cameras`;
 
-const fetchWithNgrok = (url: string, options: RequestInit = {}) => {
+const apiFetch = (url: string, options: RequestInit = {}) => {
   return fetch(url, options);
 };
 
-// fetch(`${CAMERA_API_URL}`)
 
 // User authentication API calls
 export const authAPI = {
@@ -20,7 +19,7 @@ export const authAPI = {
     password: string;
   }) => {
 
-    const response = await fetchWithNgrok(`${API_BASE_URL}/auth/register`, {
+    const response = await apiFetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -46,7 +45,7 @@ export const authAPI = {
     email: string;
     password: string;
   }) => {
-    const response = await fetchWithNgrok(`${API_BASE_URL}/auth/login`, {
+    const response = await apiFetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -66,7 +65,7 @@ export const authAPI = {
 
   // Get current user info
   getCurrentUser: async (token: string) => {
-    const response = await fetchWithNgrok(`${API_BASE_URL}/auth/me`, {
+    const response = await apiFetch(`${API_BASE_URL}/auth/me`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -88,7 +87,7 @@ export const authAPI = {
     current_password?: string;
     new_password?: string;
   }) => {
-    const response = await fetchWithNgrok(`${API_BASE_URL}/auth/profile`, {
+    const response = await apiFetch(`${API_BASE_URL}/auth/profile`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -107,7 +106,7 @@ export const authAPI = {
 
   // Send verification code
   sendVerificationCode: async (email: string) => {
-    const response = await fetchWithNgrok(`${API_BASE_URL}/auth/send-verification-code`, {
+    const response = await apiFetch(`${API_BASE_URL}/auth/send-verification-code`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -125,7 +124,7 @@ export const authAPI = {
 
   // Verify code
   verifyCode: async (email: string, code: string) => {
-    const response = await fetchWithNgrok(`${API_BASE_URL}/auth/verify-code`, {
+    const response = await apiFetch(`${API_BASE_URL}/auth/verify-code`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -143,7 +142,7 @@ export const authAPI = {
 
   // Reset password with code
   resetPasswordWithCode: async (email: string, code: string, newPassword: string) => {
-    const response = await fetchWithNgrok(`${API_BASE_URL}/auth/reset-password-with-code`, {
+    const response = await apiFetch(`${API_BASE_URL}/auth/reset-password-with-code`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -161,7 +160,7 @@ export const authAPI = {
 
   // Reset password with token
   resetPassword: async (token: string, newPassword: string) => {
-    const response = await fetchWithNgrok(`${API_BASE_URL}/auth/reset-password`, {
+    const response = await apiFetch(`${API_BASE_URL}/auth/reset-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -181,7 +180,7 @@ export const authAPI = {
   addRecoveryEmail: async (token: string, recoveryEmail: string) => {
     console.log('API: Adding recovery email', { recoveryEmail, token: token.substring(0, 20) + '...' });
 
-    const response = await fetchWithNgrok(`${API_BASE_URL}/auth/recovery-email`, {
+    const response = await apiFetch(`${API_BASE_URL}/auth/recovery-email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -205,7 +204,7 @@ export const authAPI = {
 
   // Refresh token
   refreshToken: async (token: string) => {
-    const response = await fetchWithNgrok(`${API_BASE_URL}/auth/refresh`, {
+    const response = await apiFetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -221,7 +220,7 @@ export const cameraAPI = {
 
     if (!token) return [];
 
-    const response = await fetchWithNgrok(`${CAMERA_API_URL}`, {
+    const response = await apiFetch(`${CAMERA_API_URL}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -245,7 +244,7 @@ export const cameraAPI = {
     location?: string;
     config?: Record<string, any>;
   }) => {
-    const response = await fetchWithNgrok(`${CAMERA_API_URL}/register`, {
+    const response = await apiFetch(`${CAMERA_API_URL}/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -266,7 +265,7 @@ export const cameraAPI = {
   },
 
   setCameraStreamState: async (token: string, cameraId: string, enabled: boolean) => {
-    const response = await fetchWithNgrok(`${CAMERA_API_URL}/${cameraId}/stream`, {
+    const response = await apiFetch(`${CAMERA_API_URL}/${cameraId}/stream`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -294,7 +293,7 @@ export const cameraAPI = {
   },
 
   updateCameraConfig: async (token: string, cameraId: string, config: Record<string, any>) => {
-    const response = await fetchWithNgrok(`${CAMERA_API_URL}/${cameraId}/config`, {
+    const response = await apiFetch(`${CAMERA_API_URL}/${cameraId}/config`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -322,7 +321,7 @@ export const cameraAPI = {
   },
 
   deleteCamera: async (token: string, cameraId: string) => {
-    const response = await fetchWithNgrok(`${CAMERA_API_URL}/${cameraId}`, {
+    const response = await apiFetch(`${CAMERA_API_URL}/${cameraId}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -341,7 +340,7 @@ export const cameraAPI = {
   },
 
   getLatestChunks: async (token: string, cameraId: string, limit: number = 1) => {
-    const response = await fetchWithNgrok(
+    const response = await apiFetch(
       `${CAMERA_API_URL}/${cameraId}/chunks/latest?limit=${encodeURIComponent(limit)}`,
       {
         headers: {
@@ -384,3 +383,4 @@ export const tokenManager = {
     return !!localStorage.getItem('aegis_token');
   },
 };
+
