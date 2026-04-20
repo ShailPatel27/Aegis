@@ -10,6 +10,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _csv_env_list(name: str, default: List[str]) -> List[str]:
+    raw = os.getenv(name, "")
+    if not raw.strip():
+        return default
+    items = [item.strip() for item in raw.split(",")]
+    return [item for item in items if item]
+
+
 class Settings:
     """Application settings"""
 
@@ -46,14 +54,17 @@ class Settings:
     # =========================
     # CORS Configuration
     # =========================
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000"
-    ]
+    CORS_ORIGINS: List[str] = _csv_env_list(
+        "CORS_ORIGINS",
+        [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+        ],
+    )
 
     # =========================
     # AI Model Configuration
