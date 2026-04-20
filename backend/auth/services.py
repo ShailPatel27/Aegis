@@ -114,10 +114,11 @@ class AuthService:
         response = supabase.table("users") \
             .select("*") \
             .eq("email", login_data.email.lower()) \
-            .single() \
+            .limit(1) \
             .execute()
 
-        user = response.data
+        rows = response.data if isinstance(response.data, list) else []
+        user = rows[0] if rows else None
 
         if not user:
             return APIResponse(
