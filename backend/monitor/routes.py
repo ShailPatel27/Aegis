@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from auth.dependencies import get_current_user
 from database.supabase import supabase
@@ -21,6 +22,41 @@ AI_ALERT_TYPES = [
     "unknown_face",
     "system_error",
 ]
+
+DEFAULT_FACE_VECTOR_DIM = 9216
+
+
+class FaceCreatePayload(BaseModel):
+    name: str
+    role: Optional[str] = "user"
+    image_url: Optional[str] = None
+    embedding: Optional[List[float]] = None
+
+
+class AlertCreatePayload(BaseModel):
+    camera_id: str
+    alert_type: str
+    message: Optional[str] = None
+    confidence: Optional[float] = None
+    image_url: Optional[str] = None
+    metadata: Optional[Dict] = None
+    face_name: Optional[str] = None
+
+
+def _normalize_embedding(values: Optional[List[float]]) -> List[float]:
+    if not isinstance(values, list):
+        return [0.0] * DEFAULT_FACE_VECTOR_DIM
+    casted = []
+    for v in values:
+        try:
+            casted.append(float(v))
+        except Exception:
+            casted.append(0.0)
+    if len(casted) < DEFAULT_FACE_VECTOR_DIM:
+        casted.extend([0.0] * (DEFAULT_FACE_VECTOR_DIM - len(casted)))
+    if len(casted) > DEFAULT_FACE_VECTOR_DIM:
+        casted = casted[:DEFAULT_FACE_VECTOR_DIM]
+    return casted
 
 
 def _parse_iso(ts: Optional[str]) -> Optional[datetime]:
@@ -141,6 +177,61 @@ async def get_alerts(
     }
 
 
+@router.post("/alerts")
+async def create_alert(
+    payload: AlertCreatePayload,
+    user=Depends(get_current_user),
+):
+    if payload.alert_type not in AI_ALERT_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid alert_type")
+
+    camera = (
+        supabase.table("cameras")
+        .select("id")
+        .eq("id", payload.camera_id)
+        .eq("user_id", user["id"])
+        .single()
+        .execute()
+    ).data
+    if not camera:
+        raise HTTPException(status_code=404, detail="Camera not found")
+
+    face_id = None
+    if payload.face_name:
+        face_rows = (
+            supabase.table("faces")
+            .select("id")
+            .eq("user_id", user["id"])
+            .eq("name", payload.face_name)
+            .limit(1)
+            .execute()
+        ).data or []
+        if face_rows:
+            face_id = face_rows[0].get("id")
+
+    row = {
+        "user_id": user["id"],
+        "camera_id": payload.camera_id,
+        "face_id": face_id,
+        "confidence": payload.confidence,
+        "image_url": payload.image_url,
+        "alert_type": payload.alert_type,
+        "message": payload.message,
+        "processed": False,
+        "acknowledged": False,
+        "metadata": payload.metadata or {},
+        "timestamp": datetime.utcnow().isoformat(),
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    try:
+        response = supabase.table("alerts").insert(row).execute()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to create alert: {exc}")
+
+    data = response.data or []
+    return {"success": True, "alert": data[0] if data else None}
+
+
 @router.patch("/alerts/{alert_id}")
 async def update_alert_status(
     alert_id: str,
@@ -215,6 +306,49 @@ async def get_faces(
             for f in faces
         ],
     }
+
+
+@router.post("/faces")
+async def create_face(
+    payload: FaceCreatePayload,
+    user=Depends(get_current_user),
+):
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name is required")
+
+    role = (payload.role or "user").strip() or "user"
+    embedding_vals = _normalize_embedding(payload.embedding)
+
+    existing = (
+        supabase.table("faces")
+        .select("id")
+        .eq("user_id", user["id"])
+        .eq("name", name)
+        .limit(1)
+        .execute()
+    ).data or []
+
+    row = {
+        "user_id": user["id"],
+        "name": name,
+        "role": role,
+        "image_url": payload.image_url,
+        "embedding": embedding_vals,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    try:
+        if existing:
+            face_id = existing[0]["id"]
+            response = supabase.table("faces").update(row).eq("id", face_id).execute()
+        else:
+            row["created_at"] = datetime.utcnow().isoformat()
+            response = supabase.table("faces").insert(row).execute()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Failed to store face: {exc}")
+
+    data = response.data or []
+    return {"success": True, "face": data[0] if data else None}
 
 
 @router.get("/dashboard")
