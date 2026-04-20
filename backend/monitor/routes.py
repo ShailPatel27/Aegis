@@ -257,6 +257,14 @@ def _download_image_bytes(url: Optional[str]) -> Optional[bytes]:
     return None
 
 
+def _format_alert_time(value: Optional[str]) -> str:
+    dt = _parse_iso(value)
+    if not dt:
+        return str(value or "N/A")
+    # Human-readable timestamp with timezone abbreviation.
+    return dt.astimezone().strftime("%b %d, %Y %I:%M:%S %p %Z")
+
+
 def _send_alert_email_worker(
     *,
     to_email: str,
@@ -273,11 +281,12 @@ def _send_alert_email_worker(
         return
 
     subject = f"[AEGIS] {severity.upper()} Alert: {alert_type.replace('_', ' ').title()}"
+    pretty_time = _format_alert_time(occurred_at)
     body_text = (
         f"AEGIS detected a {severity.upper()} alert.\n\n"
         f"Alert: {alert_type}\n"
         f"Camera: {camera_name}\n"
-        f"Time: {occurred_at}\n"
+        f"Time: {pretty_time}\n"
         f"Message: {message}\n"
         f"Screenshot URL: {image_url or 'N/A'}\n"
     )
@@ -288,7 +297,7 @@ def _send_alert_email_worker(
         <p><b>Severity:</b> {severity.upper()}</p>
         <p><b>Alert:</b> {alert_type}</p>
         <p><b>Camera:</b> {camera_name}</p>
-        <p><b>Time:</b> {occurred_at}</p>
+        <p><b>Time:</b> {pretty_time}</p>
         <p><b>Message:</b> {message}</p>
         <p><b>Screenshot:</b> {image_url or 'N/A'}</p>
       </body>
@@ -391,11 +400,11 @@ def _apply_alert_retention(user_id: str):
         return
     now = datetime.now(timezone.utc)
 
-    # 0) Face-related alerts older than 24h are removed.
+    # 0) Face-related alerts older than 12h are removed.
     face_delete_rows = []
     for row in rows:
         row_ts = _parse_iso(row.get("timestamp")) or _parse_iso(row.get("created_at"))
-        if not row_ts or now - row_ts < timedelta(hours=24):
+        if not row_ts or now - row_ts < timedelta(hours=12):
             continue
         alert_type = str(row.get("alert_type") or "")
         message = str(row.get("message") or "")
@@ -437,6 +446,14 @@ def _apply_alert_retention(user_id: str):
     # 2) Delete dismissed/resolved older than 5 min, but archive counts first for analytics.
     to_delete = []
     for row in rows:
+        alert_type = str(row.get("alert_type") or "")
+        message = str(row.get("message") or "")
+        is_face_related = alert_type in {"face_detected", "unknown_face"} or (
+            alert_type == "threat" and "blacklisted person detected" in message.lower()
+        )
+        # Face-related alerts must follow 12h retention policy above only.
+        if is_face_related:
+            continue
         status = _status_from_flags(row)
         if status not in {"dismissed", "resolved"}:
             continue
