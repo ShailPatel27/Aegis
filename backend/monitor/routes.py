@@ -1,18 +1,25 @@
 from collections import Counter, defaultdict
+import asyncio
 import base64
 from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
 import re
+import threading
 from typing import Dict, List, Optional
 from urllib.parse import urlparse, unquote
 from uuid import uuid4
 
+import aiosmtplib
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
+import requests
 
 from auth.dependencies import get_current_user
+from config.settings import settings
 from database.supabase import supabase
 
 router = APIRouter(tags=["Monitor"])
+_ANALYTICS_TABLE_AVAILABLE: Optional[bool] = None
 
 AI_ALERT_TYPES = [
     "intrusion",
@@ -47,6 +54,22 @@ class AlertCreatePayload(BaseModel):
     image_url: Optional[str] = None
     metadata: Optional[Dict] = None
     face_name: Optional[str] = None
+
+
+class AnalyticsIngestPayload(BaseModel):
+    camera_id: str
+    total_detections: int = 0
+    people_detected: int = 0
+    unique_people_entries: int = 0
+    recognized_faces: int = 0
+    unknown_faces: int = 0
+    timestamp: Optional[str] = None
+
+
+class MonitorSettingsPayload(BaseModel):
+    push_notifications: Optional[bool] = None
+    email_alerts: Optional[bool] = None
+    notify_email: Optional[str] = None
 
 
 def _normalize_embedding(values: Optional[List[float]]) -> List[float]:
@@ -209,6 +232,100 @@ def _delete_storage_image(camera_id: Optional[str], image_url: Optional[str]):
         pass
 
 
+def _get_monitor_settings(user_id: str, default_email: Optional[str] = None) -> dict:
+    profile_json = _get_profile_json(user_id)
+    monitor_settings = profile_json.get("monitor_settings")
+    if not isinstance(monitor_settings, dict):
+        monitor_settings = {}
+    out = {
+        "push_notifications": bool(monitor_settings.get("push_notifications", True)),
+        "email_alerts": bool(monitor_settings.get("email_alerts", True)),
+        "notify_email": str(monitor_settings.get("notify_email") or default_email or "").strip(),
+    }
+    return out
+
+
+def _download_image_bytes(url: Optional[str]) -> Optional[bytes]:
+    if not url:
+        return None
+    try:
+        resp = requests.get(url, timeout=10)
+        if resp.ok and resp.content:
+            return resp.content
+    except Exception:
+        return None
+    return None
+
+
+def _send_alert_email_worker(
+    *,
+    to_email: str,
+    alert_type: str,
+    severity: str,
+    camera_name: str,
+    occurred_at: str,
+    message: str,
+    image_url: Optional[str],
+):
+    if not to_email:
+        return
+    if not settings.USER_EMAIL or not settings.USER_PASS:
+        return
+
+    subject = f"[AEGIS] {severity.upper()} Alert: {alert_type.replace('_', ' ').title()}"
+    body_text = (
+        f"AEGIS detected a {severity.upper()} alert.\n\n"
+        f"Alert: {alert_type}\n"
+        f"Camera: {camera_name}\n"
+        f"Time: {occurred_at}\n"
+        f"Message: {message}\n"
+        f"Screenshot URL: {image_url or 'N/A'}\n"
+    )
+    body_html = f"""
+    <html>
+      <body>
+        <h2>AEGIS Alert Notification</h2>
+        <p><b>Severity:</b> {severity.upper()}</p>
+        <p><b>Alert:</b> {alert_type}</p>
+        <p><b>Camera:</b> {camera_name}</p>
+        <p><b>Time:</b> {occurred_at}</p>
+        <p><b>Message:</b> {message}</p>
+        <p><b>Screenshot:</b> {image_url or 'N/A'}</p>
+      </body>
+    </html>
+    """
+
+    msg = EmailMessage()
+    msg["From"] = settings.USER_EMAIL
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.set_content(body_text)
+    msg.add_alternative(body_html, subtype="html")
+
+    img_bytes = _download_image_bytes(image_url)
+    if img_bytes:
+        msg.add_attachment(
+            img_bytes,
+            maintype="image",
+            subtype="jpeg",
+            filename=f"aegis_alert_{int(datetime.utcnow().timestamp())}.jpg",
+        )
+
+    try:
+        asyncio.run(
+            aiosmtplib.send(
+                msg,
+                hostname=settings.SMTP_HOST,
+                port=settings.SMTP_PORT,
+                start_tls=True,
+                username=settings.USER_EMAIL,
+                password=settings.USER_PASS,
+            )
+        )
+    except Exception:
+        pass
+
+
 def _rollup_deleted_alerts(user_id: str, rows: List[dict]):
     if not rows:
         return
@@ -348,6 +465,145 @@ def _load_rollup(user_id: str) -> dict:
     profile_json = _get_profile_json(user_id)
     rollup = profile_json.get("analytics_rollup")
     return rollup if isinstance(rollup, dict) else {}
+
+
+def _load_metrics(user_id: str) -> dict:
+    global _ANALYTICS_TABLE_AVAILABLE
+    if _ANALYTICS_TABLE_AVAILABLE is not False:
+        try:
+            rows = (
+                supabase.table("analytics_daily")
+                .select("*")
+                .eq("user_id", user_id)
+                .limit(3650)
+                .execute()
+            ).data or []
+            _ANALYTICS_TABLE_AVAILABLE = True
+            metrics = {}
+            for row in rows:
+                day = str(row.get("day") or "")
+                if not day:
+                    continue
+                metrics[day] = {
+                    "total_detections": int(row.get("total_detections") or 0),
+                    "people_detected": int(row.get("people_detected") or 0),
+                    "unique_people_entries": int(row.get("unique_people_entries") or 0),
+                    "recognized_faces": int(row.get("recognized_faces") or 0),
+                    "unknown_faces": int(row.get("unknown_faces") or 0),
+                    "camera_detection_count": row.get("camera_detection_count") if isinstance(row.get("camera_detection_count"), dict) else {},
+                    "camera_people_count": row.get("camera_people_count") if isinstance(row.get("camera_people_count"), dict) else {},
+                }
+            return metrics
+        except Exception:
+            _ANALYTICS_TABLE_AVAILABLE = False
+
+    profile_json = _get_profile_json(user_id)
+    metrics = profile_json.get("analytics_metrics")
+    return metrics if isinstance(metrics, dict) else {}
+
+
+def _upsert_metrics_bucket(user_id: str, day: str, updates: dict) -> dict:
+    global _ANALYTICS_TABLE_AVAILABLE
+    if _ANALYTICS_TABLE_AVAILABLE is not False:
+        try:
+            rows = (
+                supabase.table("analytics_daily")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("day", day)
+                .limit(1)
+                .execute()
+            ).data or []
+            _ANALYTICS_TABLE_AVAILABLE = True
+            row = rows[0] if rows else {}
+            bucket = {
+                "total_detections": int(row.get("total_detections") or 0),
+                "people_detected": int(row.get("people_detected") or 0),
+                "unique_people_entries": int(row.get("unique_people_entries") or 0),
+                "recognized_faces": int(row.get("recognized_faces") or 0),
+                "unknown_faces": int(row.get("unknown_faces") or 0),
+                "camera_detection_count": row.get("camera_detection_count") if isinstance(row.get("camera_detection_count"), dict) else {},
+                "camera_people_count": row.get("camera_people_count") if isinstance(row.get("camera_people_count"), dict) else {},
+            }
+
+            for key in ("total_detections", "people_detected", "unique_people_entries", "recognized_faces", "unknown_faces"):
+                bucket[key] = int(bucket.get(key, 0)) + int(updates.get(key, 0))
+
+            camera_id = str(updates.get("camera_id") or "")
+            if camera_id:
+                cam_det = bucket.get("camera_detection_count") if isinstance(bucket.get("camera_detection_count"), dict) else {}
+                cam_people = bucket.get("camera_people_count") if isinstance(bucket.get("camera_people_count"), dict) else {}
+                cam_det[camera_id] = int(cam_det.get(camera_id, 0)) + int(updates.get("total_detections", 0))
+                cam_people[camera_id] = int(cam_people.get(camera_id, 0)) + int(updates.get("unique_people_entries", 0))
+                bucket["camera_detection_count"] = cam_det
+                bucket["camera_people_count"] = cam_people
+
+            payload = {
+                "user_id": user_id,
+                "day": day,
+                "total_detections": int(bucket["total_detections"]),
+                "people_detected": int(bucket["people_detected"]),
+                "unique_people_entries": int(bucket["unique_people_entries"]),
+                "recognized_faces": int(bucket["recognized_faces"]),
+                "unknown_faces": int(bucket["unknown_faces"]),
+                "camera_detection_count": bucket["camera_detection_count"],
+                "camera_people_count": bucket["camera_people_count"],
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+
+            if rows:
+                (
+                    supabase.table("analytics_daily")
+                    .update(payload)
+                    .eq("user_id", user_id)
+                    .eq("day", day)
+                    .execute()
+                )
+            else:
+                payload["created_at"] = datetime.utcnow().isoformat()
+                supabase.table("analytics_daily").insert(payload).execute()
+
+            return bucket
+        except Exception:
+            _ANALYTICS_TABLE_AVAILABLE = False
+
+    profile_json = _get_profile_json(user_id)
+    metrics = profile_json.get("analytics_metrics")
+    if not isinstance(metrics, dict):
+        metrics = {}
+
+    bucket = metrics.get(day)
+    if not isinstance(bucket, dict):
+        bucket = {
+            "total_detections": 0,
+            "people_detected": 0,
+            "unique_people_entries": 0,
+            "recognized_faces": 0,
+            "unknown_faces": 0,
+            "camera_detection_count": {},
+            "camera_people_count": {},
+        }
+
+    for key in ("total_detections", "people_detected", "unique_people_entries", "recognized_faces", "unknown_faces"):
+        bucket[key] = int(bucket.get(key, 0)) + int(updates.get(key, 0))
+
+    camera_id = str(updates.get("camera_id") or "")
+    if camera_id:
+        cam_det = bucket.get("camera_detection_count")
+        if not isinstance(cam_det, dict):
+            cam_det = {}
+        cam_people = bucket.get("camera_people_count")
+        if not isinstance(cam_people, dict):
+            cam_people = {}
+        cam_det[camera_id] = int(cam_det.get(camera_id, 0)) + int(updates.get("total_detections", 0))
+        cam_people[camera_id] = int(cam_people.get(camera_id, 0)) + int(updates.get("unique_people_entries", 0))
+        bucket["camera_detection_count"] = cam_det
+        bucket["camera_people_count"] = cam_people
+
+    metrics[day] = bucket
+    profile_json["analytics_metrics"] = metrics
+    _upsert_profile_json(user_id, profile_json)
+    return bucket
 
 
 def _user_cameras(user_id: str) -> List[dict]:
@@ -519,7 +775,64 @@ async def create_alert(
         raise HTTPException(status_code=400, detail=f"Failed to create alert: {exc}")
 
     data = response.data or []
-    return {"success": True, "alert": data[0] if data else None}
+    created = data[0] if data else None
+    severity = _severity_for_alert(payload.alert_type, payload.confidence)
+    if severity == "high":
+        monitor_settings = _get_monitor_settings(user["id"], user.get("email"))
+        push_on = bool(monitor_settings.get("push_notifications", True))
+        email_on = bool(monitor_settings.get("email_alerts", True))
+        notify_email = str(monitor_settings.get("notify_email") or user.get("email") or "").strip()
+        if push_on and email_on and notify_email:
+            cameras = (
+                supabase.table("cameras")
+                .select("id,name")
+                .eq("id", payload.camera_id)
+                .limit(1)
+                .execute()
+            ).data or []
+            camera_name = cameras[0].get("name") if cameras else "Unknown Camera"
+            alert_time = (created or {}).get("timestamp") or row["timestamp"]
+            threading.Thread(
+                target=_send_alert_email_worker,
+                kwargs={
+                    "to_email": notify_email,
+                    "alert_type": payload.alert_type,
+                    "severity": severity,
+                    "camera_name": camera_name,
+                    "occurred_at": str(alert_time),
+                    "message": payload.message or "",
+                    "image_url": payload.image_url,
+                },
+                daemon=True,
+            ).start()
+    return {"success": True, "alert": created}
+
+
+@router.get("/settings")
+async def get_monitor_settings(user=Depends(get_current_user)):
+    return {
+        "success": True,
+        "settings": _get_monitor_settings(user["id"], user.get("email")),
+    }
+
+
+@router.patch("/settings")
+async def update_monitor_settings(payload: MonitorSettingsPayload, user=Depends(get_current_user)):
+    profile_json = _get_profile_json(user["id"])
+    monitor_settings = profile_json.get("monitor_settings")
+    if not isinstance(monitor_settings, dict):
+        monitor_settings = {}
+
+    if payload.push_notifications is not None:
+        monitor_settings["push_notifications"] = bool(payload.push_notifications)
+    if payload.email_alerts is not None:
+        monitor_settings["email_alerts"] = bool(payload.email_alerts)
+    if payload.notify_email is not None:
+        monitor_settings["notify_email"] = str(payload.notify_email).strip()
+
+    profile_json["monitor_settings"] = monitor_settings
+    _upsert_profile_json(user["id"], profile_json)
+    return {"success": True, "settings": _get_monitor_settings(user["id"], user.get("email"))}
 
 
 @router.patch("/alerts/{alert_id}")
@@ -723,6 +1036,43 @@ async def delete_face(
     return {"success": True}
 
 
+@router.post("/analytics/ingest")
+async def ingest_analytics(
+    payload: AnalyticsIngestPayload,
+    user=Depends(get_current_user),
+):
+    camera = (
+        supabase.table("cameras")
+        .select("id")
+        .eq("id", payload.camera_id)
+        .eq("user_id", user["id"])
+        .single()
+        .execute()
+    ).data
+    if not camera:
+        raise HTTPException(status_code=404, detail="Camera not found")
+
+    ts = _parse_iso(payload.timestamp) if payload.timestamp else datetime.now(timezone.utc)
+    if ts is None:
+        ts = datetime.now(timezone.utc)
+    day = ts.date().isoformat()
+
+    bucket = _upsert_metrics_bucket(
+        user["id"],
+        day,
+        {
+            "camera_id": payload.camera_id,
+            "total_detections": max(0, int(payload.total_detections)),
+            "people_detected": max(0, int(payload.people_detected)),
+            "unique_people_entries": max(0, int(payload.unique_people_entries)),
+            "recognized_faces": max(0, int(payload.recognized_faces)),
+            "unknown_faces": max(0, int(payload.unknown_faces)),
+        },
+    )
+
+    return {"success": True, "day": day, "bucket": bucket}
+
+
 @router.get("/dashboard")
 async def get_dashboard(user=Depends(get_current_user)):
     try:
@@ -735,6 +1085,7 @@ async def get_dashboard(user=Depends(get_current_user)):
 
     cameras = _user_cameras(user["id"])
     alerts = _fetch_alerts_for_user(user["id"], 500)
+    metrics = _load_metrics(user["id"])
     faces = (
         supabase.table("faces")
         .select("id")
@@ -777,13 +1128,21 @@ async def get_dashboard(user=Depends(get_current_user)):
         idx = int(max(0, min(5, (24 - diff_h) // 4)))
         buckets[idx]["detections"] += 1
 
+    today = now.date().isoformat()
+    today_metrics = metrics.get(today) if isinstance(metrics.get(today), dict) else {}
+    total_detections_today = int(today_metrics.get("total_detections", 0))
+    total_activity_today = len(alerts_24h)
+    people_detected_today = int(today_metrics.get("unique_people_entries", 0))
+
     return {
         "success": True,
         "stats": {
-            "total_detections_today": len(alerts_24h),
+            "total_detections_today": total_detections_today,
+            "total_activity_today": total_activity_today,
             "active_cameras": len([c for c in cameras if c.get("status") == "online"]),
             "alerts_triggered": len([a for a in alerts_24h if _status_from_flags(a) == "active"]),
             "recognized_faces": len(faces),
+            "people_detected_today": people_detected_today,
         },
         "activity": buckets,
         "recent_alerts": recent,
@@ -807,6 +1166,7 @@ async def get_analytics(
     alerts = _fetch_alerts_for_user(user["id"], 3000)
     cameras = _user_cameras(user["id"])
     rollup = _load_rollup(user["id"])
+    metrics = _load_metrics(user["id"])
 
     filtered = []
     for row in alerts:
@@ -820,6 +1180,8 @@ async def get_analytics(
     recognized = 0
     unknown = 0
     active_alerts = 0
+    people_over_time_map = Counter()
+    people_total = 0
     camera_detection_count = Counter()
     camera_alert_count = Counter()
 
@@ -870,11 +1232,31 @@ async def get_analytics(
         for cid, v in calert.items():
             camera_alert_count[str(cid)] += int(v)
 
+    # Merge persistent analytics metrics (independent of alerts retention/deletions).
+    for i in range(days):
+        day = (start + timedelta(days=i)).date().isoformat()
+        bucket = metrics.get(day)
+        if not isinstance(bucket, dict):
+            continue
+        daily_counts[day] += int(bucket.get("total_detections", 0))
+        unique_people = int(bucket.get("unique_people_entries", 0))
+        people_over_time_map[day] += unique_people
+        people_total += unique_people
+
+        recognized += int(bucket.get("recognized_faces", 0))
+        unknown += int(bucket.get("unknown_faces", 0))
+
+        cam_det = bucket.get("camera_detection_count") if isinstance(bucket.get("camera_detection_count"), dict) else {}
+        for cid, v in cam_det.items():
+            camera_detection_count[str(cid)] += int(v)
+
     detection_over_time = []
+    people_over_time = []
     alerts_per_day = []
     for i in range(days):
         day = (start + timedelta(days=i)).date().isoformat()
         detection_over_time.append({"date": day, "detections": int(daily_counts.get(day, 0))})
+        people_over_time.append({"date": day, "people": int(people_over_time_map.get(day, 0))})
         sev = alerts_by_day_severity.get(day, {"high": 0, "medium": 0, "low": 0})
         alerts_per_day.append({"date": day, **sev})
 
@@ -905,11 +1287,13 @@ async def get_analytics(
         "success": True,
         "stats": {
             "total_detections": sum(daily_counts.values()),
+            "total_people_detected": people_total,
             "face_recognition_rate": round(face_rate, 2),
             "active_alerts": active_alerts,
             "active_cameras": len([c for c in cameras if c.get("status") == "online"]),
         },
         "detection_over_time": detection_over_time,
+        "people_over_time": people_over_time,
         "object_type_data": object_type_data,
         "face_recognition_data": face_breakdown,
         "alerts_per_day": alerts_per_day,
