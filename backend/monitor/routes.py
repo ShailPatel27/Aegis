@@ -1,6 +1,9 @@
 from collections import Counter, defaultdict
+import base64
 from datetime import datetime, timedelta, timezone
+import re
 from typing import Dict, List, Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -31,6 +34,8 @@ class FaceCreatePayload(BaseModel):
     role: Optional[str] = "user"
     image_url: Optional[str] = None
     embedding: Optional[List[float]] = None
+    apply_to_all: Optional[bool] = True
+    camera_ids: Optional[List[str]] = None
 
 
 class AlertCreatePayload(BaseModel):
@@ -90,6 +95,84 @@ def _status_from_flags(alert_row: dict) -> str:
     if acknowledged:
         return "dismissed"
     return "active"
+
+
+def _safe_name(value: str) -> str:
+    clean = re.sub(r"[^a-zA-Z0-9_-]+", "_", value or "").strip("_")
+    return clean or "user"
+
+
+def _decode_data_url_image(data_url: Optional[str]) -> Optional[bytes]:
+    if not data_url or not isinstance(data_url, str):
+        return None
+    if not data_url.startswith("data:image"):
+        return None
+    try:
+        _, b64 = data_url.split(",", 1)
+        return base64.b64decode(b64)
+    except Exception:
+        return None
+
+
+def _upload_face_image_for_camera(camera_id: str, name: str, image_bytes: Optional[bytes]) -> Optional[str]:
+    if not image_bytes:
+        return None
+    object_path = f"users/{_safe_name(name)}_{int(datetime.utcnow().timestamp() * 1000)}_{uuid4().hex[:8]}.jpg"
+    storage = supabase.storage.from_(camera_id)
+    try:
+        storage.upload(
+            path=object_path,
+            file=image_bytes,
+            file_options={"content-type": "image/jpeg", "upsert": "true"},
+        )
+    except TypeError:
+        storage.upload(object_path, image_bytes)
+    public_result = storage.get_public_url(object_path)
+    if isinstance(public_result, str):
+        return public_result
+    if isinstance(public_result, dict):
+        if isinstance(public_result.get("publicURL"), str):
+            return public_result["publicURL"]
+        data = public_result.get("data")
+        if isinstance(data, dict) and isinstance(data.get("publicUrl"), str):
+            return data["publicUrl"]
+    return None
+
+
+def _get_profile_json(user_id: str) -> dict:
+    rows = (
+        supabase.table("profiles")
+        .select("user_id,profile_data_json")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    ).data or []
+    if not rows:
+        return {}
+    data = rows[0].get("profile_data_json")
+    return data if isinstance(data, dict) else {}
+
+
+def _upsert_profile_json(user_id: str, profile_json: dict):
+    now = datetime.utcnow().isoformat()
+    existing = (
+        supabase.table("profiles")
+        .select("user_id")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    ).data or []
+    if existing:
+        supabase.table("profiles").update({"profile_data_json": profile_json, "updated_at": now}).eq("user_id", user_id).execute()
+    else:
+        supabase.table("profiles").insert(
+            {
+                "user_id": user_id,
+                "profile_data_json": profile_json,
+                "created_at": now,
+                "updated_at": now,
+            }
+        ).execute()
 
 
 def _user_cameras(user_id: str) -> List[dict]:
@@ -317,8 +400,32 @@ async def create_face(
     if not name:
         raise HTTPException(status_code=400, detail="Name is required")
 
-    role = (payload.role or "user").strip() or "user"
+    role = (payload.role or "user").strip().lower() or "user"
     embedding_vals = _normalize_embedding(payload.embedding)
+    cameras = _user_cameras(user["id"])
+    camera_ids = [str(c.get("id")) for c in cameras if c.get("id")]
+
+    if role == "blacklist":
+        if payload.apply_to_all:
+            target_camera_ids = camera_ids
+        else:
+            requested = [str(cid) for cid in (payload.camera_ids or [])]
+            target_camera_ids = [cid for cid in requested if cid in camera_ids]
+        if not target_camera_ids:
+            raise HTTPException(status_code=400, detail="Select at least one camera for blacklist")
+    else:
+        target_camera_ids = camera_ids
+
+    image_bytes = _decode_data_url_image(payload.image_url)
+    uploaded_urls: Dict[str, str] = {}
+    for cid in target_camera_ids:
+        try:
+            url = _upload_face_image_for_camera(cid, name, image_bytes)
+            if url:
+                uploaded_urls[cid] = url
+        except Exception:
+            continue
+    resolved_image_url = next(iter(uploaded_urls.values()), None) or payload.image_url
 
     existing = (
         supabase.table("faces")
@@ -333,7 +440,7 @@ async def create_face(
         "user_id": user["id"],
         "name": name,
         "role": role,
-        "image_url": payload.image_url,
+        "image_url": resolved_image_url,
         "embedding": embedding_vals,
         "updated_at": datetime.utcnow().isoformat(),
     }
@@ -348,7 +455,24 @@ async def create_face(
         raise HTTPException(status_code=400, detail=f"Failed to store face: {exc}")
 
     data = response.data or []
-    return {"success": True, "face": data[0] if data else None}
+    saved_face = data[0] if data else None
+
+    # Store blacklist scope metadata in profile json without requiring new tables.
+    if saved_face and saved_face.get("id"):
+        profile_json = _get_profile_json(user["id"])
+        blacklist_targets = profile_json.get("blacklist_targets")
+        if not isinstance(blacklist_targets, dict):
+            blacklist_targets = {}
+        blacklist_targets[str(saved_face["id"])] = {
+            "apply_to_all": bool(payload.apply_to_all if role == "blacklist" else True),
+            "camera_ids": target_camera_ids,
+            "uploaded_urls": uploaded_urls,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        profile_json["blacklist_targets"] = blacklist_targets
+        _upsert_profile_json(user["id"], profile_json)
+
+    return {"success": True, "face": saved_face}
 
 
 @router.get("/dashboard")
