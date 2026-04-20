@@ -7,9 +7,11 @@ import { monitorAPI, tokenManager } from "../services/api";
 type DashboardPayload = {
   stats: {
     total_detections_today: number;
+    total_activity_today: number;
     active_cameras: number;
     alerts_triggered: number;
     recognized_faces: number;
+    people_detected_today: number;
   };
   activity: Array<{ label: string; detections: number }>;
   recent_alerts: Array<{ id: string; type: string; camera: string; timestamp: string; severity: string }>;
@@ -21,7 +23,7 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDashboard = async () => {
+  const loadDashboard = async (showLoader: boolean = false) => {
     const token = tokenManager.getToken();
     if (!token) {
       setError("Not authenticated");
@@ -29,14 +31,18 @@ export function Dashboard() {
       return;
     }
     try {
-      setLoading(true);
+      if (showLoader) {
+        setLoading(true);
+      }
       const res = await monitorAPI.getDashboard(token);
       setData({
         stats: res?.stats || {
           total_detections_today: 0,
+          total_activity_today: 0,
           active_cameras: 0,
           alerts_triggered: 0,
           recognized_faces: 0,
+          people_detected_today: 0,
         },
         activity: Array.isArray(res?.activity) ? res.activity : [],
         recent_alerts: Array.isArray(res?.recent_alerts) ? res.recent_alerts : [],
@@ -50,8 +56,8 @@ export function Dashboard() {
   };
 
   useEffect(() => {
-    loadDashboard();
-    const timer = window.setInterval(loadDashboard, 7000);
+    loadDashboard(true);
+    const timer = window.setInterval(() => loadDashboard(false), 7000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -59,9 +65,9 @@ export function Dashboard() {
     const s = data?.stats;
     return [
       { label: "Total Detections Today", value: s?.total_detections_today ?? 0, icon: Activity, color: "bg-blue-500" },
+      { label: "People Detected Today", value: s?.people_detected_today ?? 0, icon: Users, color: "bg-indigo-500" },
       { label: "Active Cameras", value: s?.active_cameras ?? 0, icon: Camera, color: "bg-green-500" },
-      { label: "Alerts Triggered", value: s?.alerts_triggered ?? 0, icon: AlertTriangle, color: "bg-red-500" },
-      { label: "Recognized Faces", value: s?.recognized_faces ?? 0, icon: Users, color: "bg-purple-500" },
+      { label: "Flagged Activity", value: s?.total_activity_today ?? s?.alerts_triggered ?? 0, icon: AlertTriangle, color: "bg-red-500" },
     ];
   }, [data]);
 

@@ -93,6 +93,7 @@ function ChunkPlaybackPlayer({
   const [error, setError] = useState<string | null>(null);
   const [isLiveFollow, setIsLiveFollow] = useState(true);
   const [captureTimeLabel, setCaptureTimeLabel] = useState<string>("--:--:--");
+  const isLiveFollowRef = useRef(true);
 
   const CHUNK_STALE_MS = 7000;
 
@@ -132,6 +133,10 @@ function ChunkPlaybackPlayer({
       videoRef.current.play().catch(() => {});
     }
   };
+
+  useEffect(() => {
+    isLiveFollowRef.current = isLiveFollow;
+  }, [isLiveFollow]);
 
   useEffect(() => {
     let mounted = true;
@@ -201,7 +206,7 @@ function ChunkPlaybackPlayer({
             // If user wants "live" and video is currently ended/stalled, jump immediately.
             const video = videoRef.current;
             if (
-              isLiveFollow &&
+              isLiveFollowRef.current &&
               video &&
               (video.ended || video.readyState < 2 || (video.duration > 0 && video.currentTime >= video.duration - 0.01))
             ) {
@@ -248,7 +253,7 @@ function ChunkPlaybackPlayer({
         window.clearTimeout(timer);
       }
     };
-  }, [cameraId, streamEnabled, feedPaused, isLiveFollow]);
+  }, [cameraId, streamEnabled, feedPaused]);
 
   useEffect(() => {
     if (!videoRef.current || !videoUrl) return;
@@ -361,7 +366,7 @@ export function LiveMonitoring() {
   const [objectDetection, setObjectDetection] = useState(true);
   const [faceRecognition, setFaceRecognition] = useState(true);
   const [weaponDetection, setWeaponDetection] = useState(true);
-  const [screenshot, setScreenshot] = useState(false);
+  // const [screenshot, setScreenshot] = useState(false);
   const [layout, setLayout] = useState<LayoutType>("main-with-grid");
   const [mainCameraIndex, setMainCameraIndex] = useState(0);
   const [events, setEvents] = useState<Array<{ id: string; type: string; confidence: string; time: string; img: string }>>([]);
@@ -458,13 +463,12 @@ export function LiveMonitoring() {
         {(() => {
           const feedPaused = Boolean(camera?.config?.feed_paused);
           const streamEnabled = camera?.stream_enabled === true || camera?.status === "online";
+          if (!streamEnabled) {
+            return null;
+          }
           const isLive = streamEnabled && !feedPaused;
-          const label = !streamEnabled ? "STOPPED" : feedPaused ? "PAUSED" : "LIVE";
-          const badge = !streamEnabled
-            ? "bg-slate-600"
-            : feedPaused
-              ? "bg-yellow-600"
-              : "bg-red-600";
+          const label = feedPaused ? "PAUSED" : "LIVE";
+          const badge = feedPaused ? "bg-yellow-600" : "bg-red-600";
           return (
             <div className={`absolute top-2 left-2 ${badge} text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1`}>
               <Circle className={`w-1.5 h-1.5 fill-white ${isLive ? "animate-pulse" : ""}`} />
@@ -617,12 +621,22 @@ export function LiveMonitoring() {
             {layout === "grid" && (
               <div className="grid grid-cols-2 gap-4">
                 {cameras.map((camera) => (
-                  <button
+                  <div
                     key={camera.id}
                     onClick={() => {
                       setSelectedCamera(camera);
                       setMainCameraIndex(cameras.indexOf(camera));
                       setLayout("main-with-grid");
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedCamera(camera);
+                        setMainCameraIndex(cameras.indexOf(camera));
+                        setLayout("main-with-grid");
+                      }
                     }}
                     className={`rounded-lg overflow-hidden border-2 transition-colors ${selectedCamera?.id === camera.id
                       ? "border-blue-500"
@@ -630,7 +644,7 @@ export function LiveMonitoring() {
                       }`}
                   >
                     {renderVideoFeed(camera, false)}
-                  </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -685,7 +699,7 @@ export function LiveMonitoring() {
                 </button>
               </div>
 
-              <div className={`flex items-center justify-between p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'
+              {/* <div className={`flex items-center justify-between p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'
                 }`}>
                 <div>
                   <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Screenshots</p>
@@ -699,7 +713,7 @@ export function LiveMonitoring() {
                   <div className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform ${screenshot ? "translate-x-6" : "translate-x-0.5"
                     }`} />
                 </button>
-              </div>
+              </div> */}
             </div>
           </div>
 

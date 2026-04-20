@@ -52,7 +52,8 @@ export function CameraProvider({ children }: { children: ReactNode }) {
         clearSession();
         return;
       }
-      throw error;
+      // Keep current camera state on transient backend errors.
+      console.error("refreshCameras failed:", error);
     }
   }, [clearSession]);
 

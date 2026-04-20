@@ -500,6 +500,38 @@ export const monitorAPI = {
     if (!response.ok) throw new Error("Failed to fetch analytics");
     return response.json();
   },
+
+  getSettings: async (token: string) => {
+    const response = await apiFetch(`${MONITOR_API_URL}/settings`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (response.status === 401) throw new Error("Unauthorized");
+    if (!response.ok) throw new Error("Failed to fetch settings");
+    return response.json();
+  },
+
+  updateSettings: async (
+    token: string,
+    payload: {
+      push_notifications?: boolean;
+      email_alerts?: boolean;
+      notify_email?: string;
+    }
+  ) => {
+    const response = await apiFetch(`${MONITOR_API_URL}/settings`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (response.status === 401) throw new Error("Unauthorized");
+    if (!response.ok) throw new Error("Failed to update settings");
+    return response.json();
+  },
 };
 
 // Token management

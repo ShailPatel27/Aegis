@@ -7,11 +7,12 @@ import { monitorAPI, tokenManager } from "../services/api";
 type AnalyticsPayload = {
   stats: {
     total_detections: number;
+    total_people_detected: number;
     face_recognition_rate: number;
     active_alerts: number;
     active_cameras: number;
   };
-  detection_over_time: Array<{ date: string; detections: number }>;
+  people_over_time: Array<{ date: string; people: number }>;
   object_type_data: Array<{ type: string; count: number }>;
   face_recognition_data: Array<{ name: string; value: number; color: string }>;
   alerts_per_day: Array<{ date: string; high: number; medium: number; low: number }>;
@@ -34,16 +35,19 @@ export function Analytics() {
       return;
     }
     try {
-      setLoading(true);
+      if (!data) {
+        setLoading(true);
+      }
       const res = await monitorAPI.getAnalytics(token, targetDays);
       setData({
         stats: res?.stats || {
           total_detections: 0,
+          total_people_detected: 0,
           face_recognition_rate: 0,
           active_alerts: 0,
           active_cameras: 0,
         },
-        detection_over_time: Array.isArray(res?.detection_over_time) ? res.detection_over_time : [],
+        people_over_time: Array.isArray(res?.people_over_time) ? res.people_over_time : [],
         object_type_data: Array.isArray(res?.object_type_data) ? res.object_type_data : [],
         face_recognition_data: Array.isArray(res?.face_recognition_data) ? res.face_recognition_data : [],
         alerts_per_day: Array.isArray(res?.alerts_per_day) ? res.alerts_per_day : [],
@@ -65,6 +69,7 @@ export function Analytics() {
     const s = data?.stats;
     return [
       { label: "Total Detections", value: s?.total_detections ?? 0, icon: Camera, color: "text-blue-600" },
+      { label: "People Detected", value: s?.total_people_detected ?? 0, icon: Users, color: "text-indigo-600" },
       { label: "Face Recognition Rate", value: `${(s?.face_recognition_rate ?? 0).toFixed(1)}%`, icon: Users, color: "text-green-600" },
       { label: "Active Cameras", value: s?.active_cameras ?? 0, icon: TrendingUp, color: "text-purple-600" },
       { label: "Active Alerts", value: s?.active_alerts ?? 0, icon: AlertTriangle, color: "text-red-600" },
@@ -99,7 +104,7 @@ export function Analytics() {
         <div className={`rounded-xl p-10 text-center border ${darkMode ? "bg-gray-800 border-gray-700 text-red-300" : "bg-white border-gray-200 text-red-600"}`}>{error}</div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             {stats.map((stat) => {
               const Icon = stat.icon;
               return (
@@ -116,14 +121,14 @@ export function Analytics() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className={`rounded-xl shadow-sm p-6 border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
-              <h2 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>Detections Over Time</h2>
+              <h2 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>People Detected Over Time</h2>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={data?.detection_over_time || []}>
+                <LineChart data={data?.people_over_time || []}>
                   <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#374151" : "#e5e7eb"} />
                   <XAxis dataKey="date" stroke={darkMode ? "#9ca3af" : "#6b7280"} />
                   <YAxis stroke={darkMode ? "#9ca3af" : "#6b7280"} />
                   <Tooltip contentStyle={{ backgroundColor: darkMode ? "#1f2937" : "#fff", border: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`, borderRadius: "8px", color: darkMode ? "#f3f4f6" : "#111827" }} />
-                  <Line type="monotone" dataKey="detections" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="people" stroke="#6366f1" strokeWidth={2} dot={{ fill: "#6366f1", r: 4 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

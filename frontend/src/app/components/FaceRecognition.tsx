@@ -20,6 +20,7 @@ type FaceAlertLog = {
   timestamp: string;
   subject_name: string;
   message: string;
+  image_url: string | null;
 };
 
 type CameraRow = {
@@ -53,10 +54,12 @@ export function FaceRecognition() {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [visibleRecentCount, setVisibleRecentCount] = useState(8);
 
   const selectedUser = useMemo(() => faces.find((f) => f.id === selectedFaceId) || null, [faces, selectedFaceId]);
+  const shownLogs = useMemo(() => logs.slice(0, visibleRecentCount), [logs, visibleRecentCount]);
 
-  const loadData = async () => {
+  const loadData = async (showLoader: boolean = false) => {
     const token = tokenManager.getToken();
     if (!token) {
       setError("Not authenticated");
@@ -64,7 +67,9 @@ export function FaceRecognition() {
       return;
     }
     try {
-      setLoading(true);
+      if (showLoader) {
+        setLoading(true);
+      }
       const [facesRes, alertsRes, cameras] = await Promise.all([
         monitorAPI.getFaces(token, 500),
         monitorAPI.getAlerts(token, { limit: 200 }),
@@ -94,9 +99,11 @@ export function FaceRecognition() {
           timestamp: String(a.timestamp || ""),
           subject_name: String(a.subject_name || parseSubjectFromMessage(String(a.message || "")) || a.type || "Unknown"),
           message: String(a.message || ""),
+          image_url: a?.image_url ? String(a.image_url) : null,
         }))
         .slice(0, 12);
       setLogs(faceLogs);
+      setVisibleRecentCount(8);
       setError(null);
     } catch (err: any) {
       setError(err?.message || "Failed to load face data");
@@ -106,8 +113,8 @@ export function FaceRecognition() {
   };
 
   useEffect(() => {
-    loadData();
-    const timer = window.setInterval(loadData, 7000);
+    loadData(true);
+    const timer = window.setInterval(() => loadData(false), 7000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -338,11 +345,17 @@ export function FaceRecognition() {
           <div className={`mt-6 rounded-xl shadow-sm p-6 border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
             <h2 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>Recent Face Alerts</h2>
             <div className="space-y-3">
-              {logs.map((log) => {
+              {shownLogs.map((log) => {
                 const isBlacklisted = /blacklisted person detected/i.test(log.message || "");
                 return (
                   <div key={log.id} className={`flex items-center justify-between p-4 rounded-lg ${isBlacklisted ? (darkMode ? "bg-gray-700" : "bg-gray-200") : darkMode ? "bg-gray-700/40" : "bg-gray-50"}`}>
                     <div className="flex items-center gap-4">
+                      <img
+                        src={log.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=100&q=80"}
+                        alt={log.subject_name || log.type}
+                        className="w-12 h-12 rounded object-cover cursor-zoom-in"
+                        onClick={() => log.image_url && setPreviewImage(log.image_url)}
+                      />
                       <div className={`w-2 h-2 rounded-full ${isBlacklisted ? "bg-gray-400" : log.type === "face_detected" ? "bg-green-500" : "bg-orange-500"}`} />
                       <div>
                         <p className={`font-medium ${darkMode ? "text-white" : "text-gray-900"}`}>{log.subject_name || "Unknown"}</p>
@@ -358,6 +371,26 @@ export function FaceRecognition() {
               })}
               {logs.length === 0 && <div className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-600"}`}>No face-related alerts yet.</div>}
             </div>
+            {logs.length > 0 && (
+              <div className="mt-4 flex justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVisibleRecentCount((prev) => Math.min(logs.length, prev + 8))}
+                  disabled={visibleRecentCount >= logs.length}
+                  className={`px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 text-gray-100 disabled:opacity-50" : "bg-gray-200 text-gray-800 disabled:opacity-50"}`}
+                >
+                  View More
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibleRecentCount(logs.length)}
+                  disabled={visibleRecentCount >= logs.length}
+                  className={`px-4 py-2 rounded-lg ${darkMode ? "bg-blue-700 text-white disabled:opacity-50" : "bg-blue-600 text-white disabled:opacity-50"}`}
+                >
+                  View All
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}

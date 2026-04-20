@@ -50,12 +50,38 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(async () => {
+      const token = tokenManager.getToken();
+      if (!token) return;
+      try {
+        const newToken = await authAPI.refreshToken(token);
+        if (newToken) {
+          tokenManager.setToken(newToken);
+        }
+      } catch {
+        // Keep current session; next request can retry refresh again.
+      }
+    }, 4 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
 
   const validateToken = async (token: string) => {
     try {
       setIsLoading(true);
 
-      const userData = await authAPI.getCurrentUser(token);
+      let activeToken = token;
+      let userData: any = null;
+      try {
+        userData = await authAPI.getCurrentUser(activeToken);
+      } catch {
+        const refreshed = await authAPI.refreshToken(activeToken);
+        if (!refreshed) throw new Error("Session refresh failed");
+        tokenManager.setToken(refreshed);
+        activeToken = refreshed;
+        userData = await authAPI.getCurrentUser(activeToken);
+      }
 
       const userObj: User = {
         id: userData.id,
@@ -72,8 +98,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
     } catch (error) {
       console.error("Token validation failed:", error);
-      tokenManager.removeToken();
-      localStorage.removeItem("aegis_user");
+      // Do not force logout automatically; keep session until explicit logout.
     } finally {
       setIsLoading(false);
     }

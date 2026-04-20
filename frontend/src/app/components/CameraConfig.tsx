@@ -23,7 +23,7 @@ export function CameraConfig() {
     { key: "loiter", label: "Loitering" },
     { key: "emergency", label: "Emergency" },
     { key: "face_recognition", label: "Face Recognition" },
-    { key: "screenshot", label: "Screenshot" },
+    // { key: "screenshot", label: "Screenshot" },
   ] as const;
 
   const getCameraAiToggles = (camera: typeof cameras[number]) => {
@@ -36,7 +36,7 @@ export function CameraConfig() {
       loiter: true,
       emergency: true,
       face_recognition: true,
-      screenshot: false,
+      // screenshot: false,
     };
     const aiToggles = (camera.config as any)?.ai_toggles;
     if (!aiToggles || typeof aiToggles !== "object") {

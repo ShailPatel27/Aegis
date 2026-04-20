@@ -44,15 +44,18 @@ export function Alerts() {
   const [filterDate, setFilterDate] = useState("");
   const [pendingStatusId, setPendingStatusId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(12);
 
-  const loadAlerts = async () => {
+  const loadAlerts = async (showLoader: boolean = false) => {
     const token = tokenManager.getToken();
     if (!token) {
       setError("Not authenticated");
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (showLoader) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const res = await monitorAPI.getAlerts(token, {
@@ -75,15 +78,27 @@ export function Alerts() {
   };
 
   useEffect(() => {
-    loadAlerts();
-    const timer = window.setInterval(loadAlerts, 5000);
+    loadAlerts(true);
+    const timer = window.setInterval(() => loadAlerts(false), 5000);
     return () => window.clearInterval(timer);
   }, [filterType, filterStatus, filterCamera, filterDate]);
 
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [filterType, filterStatus, filterCamera, filterDate, filterSeverity]);
+
   const filteredAlerts = useMemo(() => {
-    if (filterSeverity === "all") return alerts;
-    return alerts.filter((a) => a.severity === filterSeverity);
+    const base = filterSeverity === "all" ? alerts : alerts.filter((a) => a.severity === filterSeverity);
+    const rank: Record<string, number> = { active: 0, dismissed: 1, resolved: 2 };
+    return [...base].sort((a, b) => {
+      const ra = rank[a.status] ?? 9;
+      const rb = rank[b.status] ?? 9;
+      if (ra !== rb) return ra - rb;
+      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    });
   }, [alerts, filterSeverity]);
+
+  const shownAlerts = useMemo(() => filteredAlerts.slice(0, visibleCount), [filteredAlerts, visibleCount]);
 
   const updateStatus = async (id: string, status: "resolved" | "dismissed") => {
     const token = tokenManager.getToken();
@@ -217,7 +232,7 @@ export function Alerts() {
         <div className={`rounded-xl p-10 text-center border ${darkMode ? "bg-gray-800 border-gray-700 text-red-300" : "bg-white border-gray-200 text-red-600"}`}>{error}</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredAlerts.map((alert) => (
+          {shownAlerts.map((alert) => (
             <div key={alert.id} className={`rounded-xl shadow-sm border-l-4 overflow-hidden ${getSeverityColor(alert.severity)}`}>
               <div className="p-6">
                 <div className="flex items-start gap-4">
@@ -288,6 +303,27 @@ export function Alerts() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {!loading && !error && filteredAlerts.length > 0 && (
+        <div className="mt-4 flex justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => setVisibleCount((prev) => Math.min(filteredAlerts.length, prev + 12))}
+            disabled={visibleCount >= filteredAlerts.length}
+            className={`px-4 py-2 rounded-lg ${darkMode ? "bg-gray-700 text-gray-100 disabled:opacity-50" : "bg-gray-200 text-gray-800 disabled:opacity-50"}`}
+          >
+            View More
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisibleCount(filteredAlerts.length)}
+            disabled={visibleCount >= filteredAlerts.length}
+            className={`px-4 py-2 rounded-lg ${darkMode ? "bg-blue-700 text-white disabled:opacity-50" : "bg-blue-600 text-white disabled:opacity-50"}`}
+          >
+            View All
+          </button>
         </div>
       )}
 

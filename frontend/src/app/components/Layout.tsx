@@ -4,7 +4,7 @@ import { useUser } from "../context/UserContext";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { UserProfile } from "./UserProfile";
 import { CameraProvider } from "../context/CameraContext";
-import { Home, Camera, Users, Bell, BarChart3, Settings, Menu, LogOut, Sun, Moon, User, Video, AlertTriangle, Cog, Monitor } from "lucide-react";
+import { Home, Camera, Users, Bell, BarChart3, Settings, Menu, LogOut, Sun, Moon, User, Video, AlertTriangle, Cog } from "lucide-react";
 
 // Camera-specific navigation
 const cameraNavItems = [
@@ -112,26 +112,6 @@ export function Layout() {
               <p className="text-sm font-medium">{user?.name || "Guest User"}</p>
               <p className="text-xs text-gray-400">{user?.email || "guest@aegis.com"}</p>
             </div>
-          </button>
-          {/* Switch Interface Button */}
-          <button
-            onClick={() => {
-              const isCamera = location.pathname.startsWith('/camera');
-              navigate(isCamera ? "/monitor/dashboard" : "/camera/add-camera");
-            }}
-            className="flex items-center gap-2 w-full px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg mb-2 transition-colors"
-          >
-            {location.pathname.startsWith('/camera') ? (
-              <>
-                <Monitor size={18} />
-                <span>Switch to Monitor</span>
-              </>
-            ) : (
-              <>
-                <Camera size={18} />
-                <span>Switch to Camera</span>
-              </>
-            )}
           </button>
           <button
             onClick={handleLogout}
