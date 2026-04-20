@@ -4,6 +4,7 @@ from typing import Optional
 from uuid import uuid4
 from datetime import datetime
 import re
+import time
 from pydantic import BaseModel
 from supabase import create_client
 
@@ -87,6 +88,34 @@ def _extract_chunk_timestamp(name: str) -> int:
     if not match:
         return 0
     return int(match.group(1))
+
+
+def _list_chunk_entries(storage, bucket_name: str):
+    try:
+        entries = storage.from_(bucket_name).list(
+            "stream-chunks",
+            {"limit": 500, "offset": 0, "sortBy": {"column": "name", "order": "desc"}},
+        )
+    except Exception:
+        entries = []
+    if not isinstance(entries, list):
+        return []
+    return [item for item in entries if isinstance(item, dict)]
+
+
+def _latest_chunk_timestamp(storage, bucket_name: str) -> int:
+    latest_ts = 0
+    for item in _list_chunk_entries(storage, bucket_name):
+        ts = _extract_chunk_timestamp(str(item.get("name") or ""))
+        if ts > latest_ts:
+            latest_ts = ts
+    return latest_ts
+
+
+def _is_chunk_stream_live(latest_ts: int, stale_after_seconds: int = 10) -> bool:
+    if latest_ts <= 0:
+        return False
+    return (time.time() - latest_ts) < stale_after_seconds
 
 
 def _public_or_signed_url(storage, bucket_name: str, chunk_path: str) -> Optional[str]:
@@ -181,13 +210,26 @@ async def get_cameras(user=Depends(get_current_user)):
             .execute()
         )
 
-        return [
-            {
-                **row,
-                "stream_enabled": is_stream_enabled(row),
-            }
-            for row in response.data
-        ]
+        rows = response.data if isinstance(response.data, list) else []
+        storage_client = admin_supabase if admin_supabase is not None else supabase
+        storage = storage_client.storage
+
+        normalized = []
+        for row in rows:
+            camera = dict(row or {})
+            camera_id = str(camera.get("id") or "")
+            bucket_name = _bucket_name_from_camera_id(camera_id)
+            latest_ts = _latest_chunk_timestamp(storage, bucket_name) if bucket_name else 0
+            is_live = _is_chunk_stream_live(latest_ts, stale_after_seconds=10)
+
+            # Display-only live state; do not mutate DB status from chunk polling.
+            camera["stream_enabled"] = bool(is_live)
+            camera["stream_live"] = bool(is_live)
+            camera["latest_chunk_timestamp"] = latest_ts if latest_ts > 0 else None
+            camera["chunk_age_seconds"] = (time.time() - latest_ts) if latest_ts > 0 else None
+            normalized.append(camera)
+
+        return normalized
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -256,7 +298,7 @@ async def get_latest_chunks(
     try:
         camera_response = (
             supabase.table("cameras")
-            .select("id")
+            .select("id,status")
             .eq("id", camera_id)
             .eq("user_id", user["id"])
             .single()
@@ -271,21 +313,10 @@ async def get_latest_chunks(
 
         storage_client = admin_supabase if admin_supabase is not None else supabase
         storage = storage_client.storage
-        try:
-            entries = storage.from_(bucket_name).list(
-                "stream-chunks",
-                {"limit": 500, "offset": 0, "sortBy": {"column": "name", "order": "desc"}},
-            )
-        except Exception:
-            entries = []
-
-        if not isinstance(entries, list):
-            entries = []
+        entries = _list_chunk_entries(storage, bucket_name)
 
         chunk_entries = []
         for item in entries:
-            if not isinstance(item, dict):
-                continue
             name = str(item.get("name") or "")
             ts = _extract_chunk_timestamp(name)
             if ts <= 0:
@@ -308,11 +339,17 @@ async def get_latest_chunks(
                 }
             )
 
+        latest_ts = chunk_entries[0][0] if chunk_entries else 0
+        is_live = _is_chunk_stream_live(latest_ts, stale_after_seconds=10)
+
         return {
             "success": True,
             "camera_id": camera_id,
             "bucket": bucket_name,
             "chunks": chunks,
+            "is_live": is_live,
+            "latest_chunk_timestamp": latest_ts if latest_ts > 0 else None,
+            "chunk_age_seconds": (time.time() - latest_ts) if latest_ts > 0 else None,
         }
     except HTTPException:
         raise

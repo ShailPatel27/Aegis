@@ -68,8 +68,15 @@ def _normalize_embedding(values: Optional[List[float]]) -> List[float]:
 def _parse_iso(ts: Optional[str]) -> Optional[datetime]:
     if not ts:
         return None
+    if isinstance(ts, datetime):
+        if ts.tzinfo is None:
+            return ts.replace(tzinfo=timezone.utc)
+        return ts.astimezone(timezone.utc)
     try:
-        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
     except Exception:
         return None
 
@@ -267,6 +274,31 @@ def _apply_alert_retention(user_id: str):
         return
     now = datetime.now(timezone.utc)
 
+    # 0) Face-related alerts older than 24h are removed.
+    face_delete_rows = []
+    for row in rows:
+        row_ts = _parse_iso(row.get("timestamp")) or _parse_iso(row.get("created_at"))
+        if not row_ts or now - row_ts < timedelta(hours=24):
+            continue
+        alert_type = str(row.get("alert_type") or "")
+        message = str(row.get("message") or "")
+        is_face_related = alert_type in {"face_detected", "unknown_face"} or (
+            alert_type == "threat" and "blacklisted person detected" in message.lower()
+        )
+        if is_face_related:
+            face_delete_rows.append(row)
+
+    if face_delete_rows:
+        _rollup_deleted_alerts(user_id, face_delete_rows)
+        for row in face_delete_rows:
+            _delete_storage_image(row.get("camera_id"), row.get("image_url"))
+            try:
+                supabase.table("alerts").delete().eq("id", row.get("id")).execute()
+            except Exception:
+                pass
+        existing_ids = {str(r.get("id")) for r in face_delete_rows}
+        rows = [r for r in rows if str(r.get("id")) not in existing_ids]
+
     # 1) Auto-dismiss low severity active alerts older than 24h and remove their image.
     for row in rows:
         if _status_from_flags(row) != "active":
@@ -352,7 +384,11 @@ async def get_alerts(
     limit: int = Query(default=100, ge=1, le=500),
     user=Depends(get_current_user),
 ):
-    _apply_alert_retention(user["id"])
+    try:
+        _apply_alert_retention(user["id"])
+    except Exception:
+        # Never block alerts endpoint on retention failures.
+        pass
     cameras = _user_cameras(user["id"])
     camera_map = {c["id"]: c for c in cameras if c.get("id")}
     alerts = _fetch_alerts_for_user(user["id"], max(limit, 250))
@@ -689,7 +725,10 @@ async def delete_face(
 
 @router.get("/dashboard")
 async def get_dashboard(user=Depends(get_current_user)):
-    _apply_alert_retention(user["id"])
+    try:
+        _apply_alert_retention(user["id"])
+    except Exception:
+        pass
     now = datetime.now(timezone.utc)
     start_24h = now - timedelta(hours=24)
     start_24h_iso = start_24h.isoformat()
@@ -758,7 +797,10 @@ async def get_analytics(
     user=Depends(get_current_user),
 ):
     now = datetime.now(timezone.utc)
-    _apply_alert_retention(user["id"])
+    try:
+        _apply_alert_retention(user["id"])
+    except Exception:
+        pass
     start = now - timedelta(days=days - 1)
     start_iso = start.isoformat()
 
