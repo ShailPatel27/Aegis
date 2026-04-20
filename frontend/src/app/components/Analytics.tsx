@@ -1,308 +1,229 @@
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Sector, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { TrendingUp, Users, Camera, AlertTriangle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Sector, Tooltip, XAxis, YAxis } from "recharts";
+import { AlertTriangle, Camera, TrendingUp, Users } from "lucide-react";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
-import { useState } from "react";
+import { monitorAPI, tokenManager } from "../services/api";
 
-const detectionOverTime = [
-  { id: "det-1", date: "Feb 24", detections: 234 },
-  { id: "det-2", date: "Feb 25", detections: 187 },
-  { id: "det-3", date: "Feb 26", detections: 298 },
-  { id: "det-4", date: "Feb 27", detections: 265 },
-  { id: "det-5", date: "Feb 28", detections: 312 },
-  { id: "det-6", date: "Mar 01", detections: 289 },
-  { id: "det-7", date: "Mar 02", detections: 347 },
-];
-
-const objectTypeData = [
-  { id: "obj-1", type: "Person", count: 1247 },
-  { id: "obj-2", type: "Vehicle", count: 342 },
-  { id: "obj-3", type: "Package", count: 156 },
-  { id: "obj-4", type: "Animal", count: 89 },
-  { id: "obj-5", type: "Unknown", count: 45 },
-];
-
-const faceRecognitionData = [
-  { id: "face-1", name: "Recognized", value: 782, color: "#10b981" },
-  { id: "face-2", name: "Unknown", value: 234, color: "#f59e0b" },
-  { id: "face-3", name: "Blacklist", value: 12, color: "#ef4444" },
-];
-
-const alertsPerDay = [
-  { id: "alert-1", date: "Feb 24", high: 3, medium: 7, low: 12 },
-  { id: "alert-2", date: "Feb 25", high: 2, medium: 5, low: 9 },
-  { id: "alert-3", date: "Feb 26", high: 5, medium: 8, low: 14 },
-  { id: "alert-4", date: "Feb 27", high: 1, medium: 6, low: 11 },
-  { id: "alert-5", date: "Feb 28", high: 4, medium: 9, low: 15 },
-  { id: "alert-6", date: "Mar 01", high: 2, medium: 7, low: 10 },
-  { id: "alert-7", date: "Mar 02", high: 3, medium: 8, low: 13 },
-];
-
-const stats = [
-  { label: "Total Detections", value: "12,847", change: "+12.5%", icon: Camera, color: "text-blue-600" },
-  { label: "Face Recognition Rate", value: "94.2%", change: "+2.1%", icon: Users, color: "text-green-600" },
-  { label: "Alert Response Time", value: "2.3 min", change: "-15.3%", icon: TrendingUp, color: "text-purple-600" },
-  { label: "Active Alerts", value: "8", change: "-20%", icon: AlertTriangle, color: "text-red-600" },
-];
+type AnalyticsPayload = {
+  stats: {
+    total_detections: number;
+    face_recognition_rate: number;
+    active_alerts: number;
+    active_cameras: number;
+  };
+  detection_over_time: Array<{ date: string; detections: number }>;
+  object_type_data: Array<{ type: string; count: number }>;
+  face_recognition_data: Array<{ name: string; value: number; color: string }>;
+  alerts_per_day: Array<{ date: string; high: number; medium: number; low: number }>;
+  camera_performance: Array<{ camera: string; uptime: string; detections: number; alerts: number; accuracy: string }>;
+};
 
 export function Analytics() {
   const { darkMode } = useSharedDarkMode();
+  const [days, setDays] = useState(7);
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<AnalyticsPayload | null>(null);
+
+  const loadAnalytics = async (targetDays: number = days) => {
+    const token = tokenManager.getToken();
+    if (!token) {
+      setError("Not authenticated");
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await monitorAPI.getAnalytics(token, targetDays);
+      setData({
+        stats: res?.stats || {
+          total_detections: 0,
+          face_recognition_rate: 0,
+          active_alerts: 0,
+          active_cameras: 0,
+        },
+        detection_over_time: Array.isArray(res?.detection_over_time) ? res.detection_over_time : [],
+        object_type_data: Array.isArray(res?.object_type_data) ? res.object_type_data : [],
+        face_recognition_data: Array.isArray(res?.face_recognition_data) ? res.face_recognition_data : [],
+        alerts_per_day: Array.isArray(res?.alerts_per_day) ? res.alerts_per_day : [],
+        camera_performance: Array.isArray(res?.camera_performance) ? res.camera_performance : [],
+      });
+      setError(null);
+    } catch (err: any) {
+      setError(err?.message || "Failed to load analytics");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAnalytics(days);
+  }, [days]);
+
+  const stats = useMemo(() => {
+    const s = data?.stats;
+    return [
+      { label: "Total Detections", value: s?.total_detections ?? 0, icon: Camera, color: "text-blue-600" },
+      { label: "Face Recognition Rate", value: `${(s?.face_recognition_rate ?? 0).toFixed(1)}%`, icon: Users, color: "text-green-600" },
+      { label: "Active Cameras", value: s?.active_cameras ?? 0, icon: TrendingUp, color: "text-purple-600" },
+      { label: "Active Alerts", value: s?.active_alerts ?? 0, icon: AlertTriangle, color: "text-red-600" },
+    ];
+  }, [data]);
+
   return (
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Analytics</h1>
-          <p className={`mt-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Visual insights and system performance</p>
+          <h1 className={`text-3xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>Analytics</h1>
+          <p className={`mt-1 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>Visual insights and system performance</p>
         </div>
         <div className="flex items-center gap-3">
-          <label className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Date Range:</label>
-          <select className={`px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-            darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'
-          }`}>
-            <option>Last 7 Days</option>
-            <option>Last 30 Days</option>
-            <option>Last 90 Days</option>
-            <option>Custom Range</option>
+          <label className={`text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>Date Range:</label>
+          <select
+            title="Select date range"
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+            className={`px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${darkMode ? "bg-gray-700 border-gray-600 text-white" : "bg-white border-gray-300"}`}
+          >
+            <option value={7}>Last 7 Days</option>
+            <option value={30}>Last 30 Days</option>
+            <option value={90}>Last 90 Days</option>
           </select>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.label} className={`rounded-xl shadow-sm p-6 border ${
-              darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-            }`}>
-              <div className="flex items-center justify-between mb-3">
-                <Icon className={stat.color} size={24} />
-                <span className={`text-sm font-medium ${
-                  stat.change.startsWith('+') 
-                    ? darkMode ? 'text-green-400' : 'text-green-600'
-                    : darkMode ? 'text-red-400' : 'text-red-600'
-                }`}>
-                  {stat.change}
-                </span>
-              </div>
-              <p className={`text-sm mb-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{stat.label}</p>
-              <p className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{stat.value}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Detection Over Time */}
-        <div className={`rounded-xl shadow-sm p-6 border ${
-          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-        }`}>
-          <h2 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Detections Over Time</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={detectionOverTime}>
-              <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="date" stroke={darkMode ? '#9ca3af' : '#6b7280'} />
-              <YAxis stroke={darkMode ? '#9ca3af' : '#6b7280'} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: darkMode ? '#1f2937' : '#fff', 
-                  border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, 
-                  borderRadius: '8px',
-                  color: darkMode ? '#f3f4f6' : '#111827'
-                }}
-              />
-              <Line 
-                key="detections-line"
-                type="monotone" 
-                dataKey="detections" 
-                stroke="#3b82f6" 
-                strokeWidth={2}
-                dot={{ fill: '#3b82f6', r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Object Type Distribution */}
-        <div className={`rounded-xl shadow-sm p-6 border ${
-          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-        }`}>
-          <h2 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Object Type Distribution</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={objectTypeData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="type" stroke={darkMode ? '#9ca3af' : '#6b7280'} />
-              <YAxis stroke={darkMode ? '#9ca3af' : '#6b7280'} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: darkMode ? '#1f2937' : '#fff', 
-                  border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, 
-                  borderRadius: '8px',
-                  color: darkMode ? '#f3f4f6' : '#111827'
-                }}
-              />
-              <Bar key="count-bar" dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Face Recognition Breakdown */}
-        <div className={`rounded-xl shadow-sm p-6 border ${
-          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-        }`}>
-          <h2 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Face Recognition Breakdown</h2>
-          <div className="flex items-center justify-center">
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  key="face-recognition-pie"
-                  data={faceRecognitionData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                  activeIndex={activeIndex}
-                  activeShape={(props: any) => {
-                    const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
-                    return (
-                      <Sector
-                        cx={cx}
-                        cy={cy}
-                        innerRadius={innerRadius}
-                        outerRadius={outerRadius + 10}
-                        startAngle={startAngle}
-                        endAngle={endAngle}
-                        fill={fill}
-                      />
-                    );
-                  }}
-                  onMouseEnter={(_, index) => setActiveIndex(index)}
-                  onMouseLeave={() => setActiveIndex(undefined)}
-                >
-                  {faceRecognitionData.map((entry) => (
-                    <Cell key={`cell-${entry.id}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: darkMode ? '#1f2937' : '#fff', 
-                    border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, 
-                    borderRadius: '8px'
-                  }}
-                  labelStyle={{ 
-                    color: darkMode ? '#f3f4f6' : '#111827'
-                  }}
-                  itemStyle={{ 
-                    color: darkMode ? '#f3f4f6' : '#111827'
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="grid grid-cols-3 gap-4 mt-4">
-            {faceRecognitionData.map((item) => (
-              <div key={item.name} className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{item.name}</span>
+      {loading ? (
+        <div className={`rounded-xl p-10 text-center border ${darkMode ? "bg-gray-800 border-gray-700 text-gray-300" : "bg-white border-gray-200 text-gray-600"}`}>Loading analytics...</div>
+      ) : error ? (
+        <div className={`rounded-xl p-10 text-center border ${darkMode ? "bg-gray-800 border-gray-700 text-red-300" : "bg-white border-gray-200 text-red-600"}`}>{error}</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {stats.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div key={stat.label} className={`rounded-xl shadow-sm p-6 border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <Icon className={stat.color} size={24} />
+                  </div>
+                  <p className={`text-sm mb-1 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>{stat.label}</p>
+                  <p className={`text-2xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>{stat.value}</p>
                 </div>
-                <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{item.value}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </div>
 
-        {/* Alerts Per Day */}
-        <div className={`rounded-xl shadow-sm p-6 border ${
-          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-        }`}>
-          <h2 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Alerts by Severity</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={alertsPerDay}>
-              <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-              <XAxis dataKey="date" stroke={darkMode ? '#9ca3af' : '#6b7280'} />
-              <YAxis stroke={darkMode ? '#9ca3af' : '#6b7280'} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: darkMode ? '#1f2937' : '#fff', 
-                  border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, 
-                  borderRadius: '8px',
-                  color: darkMode ? '#f3f4f6' : '#111827'
-                }}
-              />
-              <Legend />
-              <Bar key="high-bar" dataKey="high" stackId="a" fill="#ef4444" name="High" radius={[0, 0, 0, 0]} />
-              <Bar key="medium-bar" dataKey="medium" stackId="a" fill="#f59e0b" name="Medium" radius={[0, 0, 0, 0]} />
-              <Bar key="low-bar" dataKey="low" stackId="a" fill="#fbbf24" name="Low" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className={`rounded-xl shadow-sm p-6 border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+              <h2 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>Detections Over Time</h2>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={data?.detection_over_time || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#374151" : "#e5e7eb"} />
+                  <XAxis dataKey="date" stroke={darkMode ? "#9ca3af" : "#6b7280"} />
+                  <YAxis stroke={darkMode ? "#9ca3af" : "#6b7280"} />
+                  <Tooltip contentStyle={{ backgroundColor: darkMode ? "#1f2937" : "#fff", border: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`, borderRadius: "8px", color: darkMode ? "#f3f4f6" : "#111827" }} />
+                  <Line type="monotone" dataKey="detections" stroke="#3b82f6" strokeWidth={2} dot={{ fill: "#3b82f6", r: 4 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
 
-      {/* Camera Performance Table */}
-      <div className={`mt-6 rounded-xl shadow-sm border overflow-hidden ${
-        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-      }`}>
-        <div className={`p-6 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera Performance</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-              <tr>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Camera</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Uptime</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Detections</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Alerts</th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>Accuracy</th>
-              </tr>
-            </thead>
-            <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-              <tr className={`transition-colors ${
-                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
-              }`}>
-                <td className={`px-6 py-4 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera 1 - Main Entrance</td>
-                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>99.8%</td>
-                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>2,347</td>
-                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>12</td>
-                <td className="px-6 py-4"><span className={`font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>96.2%</span></td>
-              </tr>
-              <tr className={`transition-colors ${
-                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
-              }`}>
-                <td className={`px-6 py-4 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera 2 - Parking Lot</td>
-                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>98.5%</td>
-                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>1,892</td>
-                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>8</td>
-                <td className="px-6 py-4"><span className={`font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>94.7%</span></td>
-              </tr>
-              <tr className={`transition-colors ${
-                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
-              }`}>
-                <td className={`px-6 py-4 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera 3 - Hallway A</td>
-                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>100%</td>
-                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>3,124</td>
-                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>15</td>
-                <td className="px-6 py-4"><span className={`font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>97.1%</span></td>
-              </tr>
-              <tr className={`transition-colors ${
-                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
-              }`}>
-                <td className={`px-6 py-4 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>Camera 4 - Side Entrance</td>
-                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>97.2%</td>
-                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>1,456</td>
-                <td className={`px-6 py-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>6</td>
-                <td className="px-6 py-4"><span className={`font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>93.8%</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+            <div className={`rounded-xl shadow-sm p-6 border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+              <h2 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>Object Type Distribution</h2>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={data?.object_type_data || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#374151" : "#e5e7eb"} />
+                  <XAxis dataKey="type" stroke={darkMode ? "#9ca3af" : "#6b7280"} />
+                  <YAxis stroke={darkMode ? "#9ca3af" : "#6b7280"} />
+                  <Tooltip contentStyle={{ backgroundColor: darkMode ? "#1f2937" : "#fff", border: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`, borderRadius: "8px", color: darkMode ? "#f3f4f6" : "#111827" }} />
+                  <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className={`rounded-xl shadow-sm p-6 border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+              <h2 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>Face Recognition Breakdown</h2>
+              <div className="flex items-center justify-center">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={data?.face_recognition_data || []}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                      outerRadius={100}
+                      dataKey="value"
+                      activeIndex={activeIndex}
+                      activeShape={(props: any) => {
+                        const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+                        return <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius + 10} startAngle={startAngle} endAngle={endAngle} fill={fill} />;
+                      }}
+                      onMouseEnter={(_, index) => setActiveIndex(index)}
+                      onMouseLeave={() => setActiveIndex(undefined)}
+                    >
+                      {(data?.face_recognition_data || []).map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: darkMode ? "#1f2937" : "#fff", border: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`, borderRadius: "8px" }}
+                      labelStyle={{ color: darkMode ? "#f3f4f6" : "#111827" }}
+                      itemStyle={{ color: darkMode ? "#f3f4f6" : "#111827" }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className={`rounded-xl shadow-sm p-6 border ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+              <h2 className={`text-lg font-semibold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>Alerts by Severity</h2>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={data?.alerts_per_day || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#374151" : "#e5e7eb"} />
+                  <XAxis dataKey="date" stroke={darkMode ? "#9ca3af" : "#6b7280"} />
+                  <YAxis stroke={darkMode ? "#9ca3af" : "#6b7280"} />
+                  <Tooltip contentStyle={{ backgroundColor: darkMode ? "#1f2937" : "#fff", border: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`, borderRadius: "8px", color: darkMode ? "#f3f4f6" : "#111827" }} />
+                  <Legend />
+                  <Bar dataKey="high" stackId="a" fill="#ef4444" name="High" />
+                  <Bar dataKey="medium" stackId="a" fill="#f59e0b" name="Medium" />
+                  <Bar dataKey="low" stackId="a" fill="#fbbf24" name="Low" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className={`mt-6 rounded-xl shadow-sm border overflow-hidden ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+            <div className={`p-6 border-b ${darkMode ? "border-gray-700" : "border-gray-200"}`}>
+              <h2 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-gray-900"}`}>Camera Performance</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className={`${darkMode ? "bg-gray-700" : "bg-gray-50"}`}>
+                  <tr>
+                    <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? "text-gray-300" : "text-gray-500"}`}>Camera</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? "text-gray-300" : "text-gray-500"}`}>Uptime</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? "text-gray-300" : "text-gray-500"}`}>Detections</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? "text-gray-300" : "text-gray-500"}`}>Alerts</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? "text-gray-300" : "text-gray-500"}`}>Accuracy</th>
+                  </tr>
+                </thead>
+                <tbody className={`divide-y ${darkMode ? "divide-gray-700" : "divide-gray-200"}`}>
+                  {(data?.camera_performance || []).map((row) => (
+                    <tr key={row.camera} className={`transition-colors ${darkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"}`}>
+                      <td className={`px-6 py-4 font-medium ${darkMode ? "text-white" : "text-gray-900"}`}>{row.camera}</td>
+                      <td className={`px-6 py-4 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>{row.uptime}</td>
+                      <td className={`px-6 py-4 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>{row.detections}</td>
+                      <td className={`px-6 py-4 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>{row.alerts}</td>
+                      <td className={`px-6 py-4 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>{row.accuracy}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

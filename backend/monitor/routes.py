@@ -3,6 +3,7 @@ import base64
 from datetime import datetime, timedelta, timezone
 import re
 from typing import Dict, List, Optional
+from urllib.parse import urlparse, unquote
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -175,6 +176,148 @@ def _upsert_profile_json(user_id: str, profile_json: dict):
         ).execute()
 
 
+def _extract_storage_path_from_public_url(image_url: Optional[str], bucket: str) -> Optional[str]:
+    if not image_url or not isinstance(image_url, str):
+        return None
+    try:
+        parsed = urlparse(image_url)
+        marker = f"/storage/v1/object/public/{bucket}/"
+        idx = parsed.path.find(marker)
+        if idx < 0:
+            return None
+        return unquote(parsed.path[idx + len(marker):])
+    except Exception:
+        return None
+
+
+def _delete_storage_image(camera_id: Optional[str], image_url: Optional[str]):
+    if not camera_id or not image_url:
+        return
+    object_path = _extract_storage_path_from_public_url(image_url, str(camera_id))
+    if not object_path:
+        return
+    try:
+        supabase.storage.from_(str(camera_id)).remove([object_path])
+    except Exception:
+        pass
+
+
+def _rollup_deleted_alerts(user_id: str, rows: List[dict]):
+    if not rows:
+        return
+    profile_json = _get_profile_json(user_id)
+    analytics_rollup = profile_json.get("analytics_rollup")
+    if not isinstance(analytics_rollup, dict):
+        analytics_rollup = {}
+
+    for row in rows:
+        ts = _parse_iso(row.get("timestamp")) or _parse_iso(row.get("created_at")) or datetime.now(timezone.utc)
+        day = ts.date().isoformat()
+        bucket = analytics_rollup.get(day)
+        if not isinstance(bucket, dict):
+            bucket = {
+                "detections": 0,
+                "recognized": 0,
+                "unknown": 0,
+                "active_alerts": 0,
+                "type_counts": {},
+                "severity_counts": {"high": 0, "medium": 0, "low": 0},
+                "camera_detection_count": {},
+                "camera_alert_count": {},
+            }
+
+        alert_type = str(row.get("alert_type") or "system_error")
+        severity = _severity_for_alert(alert_type, row.get("confidence"))
+        cid = str(row.get("camera_id") or "")
+
+        bucket["detections"] = int(bucket.get("detections", 0)) + 1
+        if alert_type == "face_detected":
+            bucket["recognized"] = int(bucket.get("recognized", 0)) + 1
+        if alert_type == "unknown_face":
+            bucket["unknown"] = int(bucket.get("unknown", 0)) + 1
+        if _status_from_flags(row) == "active":
+            bucket["active_alerts"] = int(bucket.get("active_alerts", 0)) + 1
+
+        type_counts = bucket.get("type_counts") if isinstance(bucket.get("type_counts"), dict) else {}
+        type_counts[alert_type] = int(type_counts.get(alert_type, 0)) + 1
+        bucket["type_counts"] = type_counts
+
+        severity_counts = bucket.get("severity_counts") if isinstance(bucket.get("severity_counts"), dict) else {"high": 0, "medium": 0, "low": 0}
+        severity_counts[severity] = int(severity_counts.get(severity, 0)) + 1
+        bucket["severity_counts"] = severity_counts
+
+        if cid:
+            camera_detection = bucket.get("camera_detection_count") if isinstance(bucket.get("camera_detection_count"), dict) else {}
+            camera_alert = bucket.get("camera_alert_count") if isinstance(bucket.get("camera_alert_count"), dict) else {}
+            camera_detection[cid] = int(camera_detection.get(cid, 0)) + 1
+            if severity in {"high", "medium"}:
+                camera_alert[cid] = int(camera_alert.get(cid, 0)) + 1
+            bucket["camera_detection_count"] = camera_detection
+            bucket["camera_alert_count"] = camera_alert
+
+        analytics_rollup[day] = bucket
+
+    profile_json["analytics_rollup"] = analytics_rollup
+    _upsert_profile_json(user_id, profile_json)
+
+
+def _apply_alert_retention(user_id: str):
+    rows = _fetch_alerts_for_user(user_id, limit=2000)
+    if not rows:
+        return
+    now = datetime.now(timezone.utc)
+
+    # 1) Auto-dismiss low severity active alerts older than 24h and remove their image.
+    for row in rows:
+        if _status_from_flags(row) != "active":
+            continue
+        row_ts = _parse_iso(row.get("timestamp")) or _parse_iso(row.get("created_at"))
+        if not row_ts:
+            continue
+        if now - row_ts < timedelta(hours=24):
+            continue
+        severity = _severity_for_alert(str(row.get("alert_type") or "system_error"), row.get("confidence"))
+        if severity != "low":
+            continue
+        _delete_storage_image(row.get("camera_id"), row.get("image_url"))
+        try:
+            supabase.table("alerts").update({"acknowledged": True, "processed": False, "image_url": None}).eq("id", row.get("id")).execute()
+        except Exception:
+            pass
+
+    # 2) Delete dismissed/resolved older than 5 min, but archive counts first for analytics.
+    to_delete = []
+    for row in rows:
+        status = _status_from_flags(row)
+        if status not in {"dismissed", "resolved"}:
+            continue
+        row_ts = (
+            _parse_iso(row.get("resolved_at"))
+            or _parse_iso(row.get("acknowledged_at"))
+            or _parse_iso(row.get("timestamp"))
+            or _parse_iso(row.get("created_at"))
+        )
+        if not row_ts:
+            continue
+        if now - row_ts >= timedelta(minutes=5):
+            to_delete.append(row)
+
+    if to_delete:
+        _rollup_deleted_alerts(user_id, to_delete)
+        for row in to_delete:
+            _delete_storage_image(row.get("camera_id"), row.get("image_url"))
+            try:
+                supabase.table("alerts").delete().eq("id", row.get("id")).execute()
+            except Exception:
+                pass
+
+
+def _load_rollup(user_id: str) -> dict:
+    profile_json = _get_profile_json(user_id)
+    rollup = profile_json.get("analytics_rollup")
+    return rollup if isinstance(rollup, dict) else {}
+
+
 def _user_cameras(user_id: str) -> List[dict]:
     response = (
         supabase.table("cameras")
@@ -209,9 +352,21 @@ async def get_alerts(
     limit: int = Query(default=100, ge=1, le=500),
     user=Depends(get_current_user),
 ):
+    _apply_alert_retention(user["id"])
     cameras = _user_cameras(user["id"])
     camera_map = {c["id"]: c for c in cameras if c.get("id")}
     alerts = _fetch_alerts_for_user(user["id"], max(limit, 250))
+    face_map = {}
+    try:
+        face_rows = (
+            supabase.table("faces")
+            .select("id,name")
+            .eq("user_id", user["id"])
+            .execute()
+        ).data or []
+        face_map = {f.get("id"): f.get("name") for f in face_rows if f.get("id")}
+    except Exception:
+        face_map = {}
 
     out = []
     for row in alerts:
@@ -234,6 +389,13 @@ async def get_alerts(
         if date and row_date is None:
             continue
 
+        message = row.get("message") or ""
+        subject_name = face_map.get(row.get("face_id"))
+        if not subject_name and isinstance(message, str):
+            m = re.search(r"(User detected|Blacklisted person detected):\s*([^\(\n\r]+)", message)
+            if m:
+                subject_name = m.group(2).strip()
+
         out.append(
             {
                 "id": row.get("id"),
@@ -244,13 +406,22 @@ async def get_alerts(
                 "severity": _severity_for_alert(row_type, confidence),
                 "confidence": confidence,
                 "status": row_status,
-                "message": row.get("message") or "",
+                "message": message,
+                "subject_name": subject_name,
                 "image_url": row.get("image_url"),
                 "metadata": row.get("metadata") or {},
             }
         )
         if len(out) >= limit:
             break
+
+    status_rank = {"active": 0, "dismissed": 1, "resolved": 2}
+    out.sort(
+        key=lambda r: (
+            status_rank.get(r.get("status"), 9),
+            -(int((_parse_iso(r.get("timestamp")) or datetime.now(timezone.utc)).timestamp())),
+        )
+    )
 
     return {
         "success": True,
@@ -331,11 +502,20 @@ async def update_alert_status(
         raise HTTPException(status_code=404, detail="Alert not found")
 
     if status == "active":
-        update = {"processed": False, "acknowledged": False}
+        update = {"processed": False, "acknowledged": False, "resolved_at": None, "acknowledged_at": None}
     elif status == "resolved":
-        update = {"processed": True, "acknowledged": True}
+        update = {
+            "processed": True,
+            "acknowledged": True,
+            "resolved_at": datetime.utcnow().isoformat(),
+            "acknowledged_at": datetime.utcnow().isoformat(),
+        }
     else:
-        update = {"processed": False, "acknowledged": True}
+        update = {
+            "processed": False,
+            "acknowledged": True,
+            "acknowledged_at": datetime.utcnow().isoformat(),
+        }
 
     supabase.table("alerts").update(update).eq("id", alert_id).execute()
     return {"success": True}
@@ -429,12 +609,14 @@ async def create_face(
 
     existing = (
         supabase.table("faces")
-        .select("id")
+        .select("id,name")
         .eq("user_id", user["id"])
         .eq("name", name)
         .limit(1)
         .execute()
     ).data or []
+    if existing:
+        raise HTTPException(status_code=409, detail="User already exists")
 
     row = {
         "user_id": user["id"],
@@ -445,12 +627,8 @@ async def create_face(
         "updated_at": datetime.utcnow().isoformat(),
     }
     try:
-        if existing:
-            face_id = existing[0]["id"]
-            response = supabase.table("faces").update(row).eq("id", face_id).execute()
-        else:
-            row["created_at"] = datetime.utcnow().isoformat()
-            response = supabase.table("faces").insert(row).execute()
+        row["created_at"] = datetime.utcnow().isoformat()
+        response = supabase.table("faces").insert(row).execute()
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Failed to store face: {exc}")
 
@@ -475,8 +653,43 @@ async def create_face(
     return {"success": True, "face": saved_face}
 
 
+@router.delete("/faces/{face_id}")
+async def delete_face(
+    face_id: str,
+    user=Depends(get_current_user),
+):
+    row = (
+        supabase.table("faces")
+        .select("id,image_url")
+        .eq("id", face_id)
+        .eq("user_id", user["id"])
+        .limit(1)
+        .execute()
+    ).data or []
+    if not row:
+        raise HTTPException(status_code=404, detail="Face not found")
+    face = row[0]
+
+    # Remove image from all user camera buckets if path matches.
+    cameras = _user_cameras(user["id"])
+    for camera in cameras:
+        _delete_storage_image(camera.get("id"), face.get("image_url"))
+
+    supabase.table("faces").delete().eq("id", face_id).execute()
+
+    profile_json = _get_profile_json(user["id"])
+    blacklist_targets = profile_json.get("blacklist_targets")
+    if isinstance(blacklist_targets, dict) and face_id in blacklist_targets:
+        blacklist_targets.pop(face_id, None)
+        profile_json["blacklist_targets"] = blacklist_targets
+        _upsert_profile_json(user["id"], profile_json)
+
+    return {"success": True}
+
+
 @router.get("/dashboard")
 async def get_dashboard(user=Depends(get_current_user)):
+    _apply_alert_retention(user["id"])
     now = datetime.now(timezone.utc)
     start_24h = now - timedelta(hours=24)
     start_24h_iso = start_24h.isoformat()
@@ -545,11 +758,13 @@ async def get_analytics(
     user=Depends(get_current_user),
 ):
     now = datetime.now(timezone.utc)
+    _apply_alert_retention(user["id"])
     start = now - timedelta(days=days - 1)
     start_iso = start.isoformat()
 
     alerts = _fetch_alerts_for_user(user["id"], 3000)
     cameras = _user_cameras(user["id"])
+    rollup = _load_rollup(user["id"])
 
     filtered = []
     for row in alerts:
@@ -584,6 +799,34 @@ async def get_analytics(
             camera_detection_count[cid] += 1
             if severity in {"high", "medium"}:
                 camera_alert_count[cid] += 1
+
+    # Merge archived/deleted alert counts.
+    for i in range(days):
+        day = (start + timedelta(days=i)).date().isoformat()
+        bucket = rollup.get(day)
+        if not isinstance(bucket, dict):
+            continue
+        daily_counts[day] += int(bucket.get("detections", 0))
+        recognized += int(bucket.get("recognized", 0))
+        unknown += int(bucket.get("unknown", 0))
+        active_alerts += int(bucket.get("active_alerts", 0))
+
+        sev = bucket.get("severity_counts") if isinstance(bucket.get("severity_counts"), dict) else {}
+        alerts_by_day_severity[day]["high"] += int(sev.get("high", 0))
+        alerts_by_day_severity[day]["medium"] += int(sev.get("medium", 0))
+        alerts_by_day_severity[day]["low"] += int(sev.get("low", 0))
+
+        tcounts = bucket.get("type_counts") if isinstance(bucket.get("type_counts"), dict) else {}
+        for k, v in tcounts.items():
+            type_counts[str(k)] += int(v)
+
+        cdet = bucket.get("camera_detection_count") if isinstance(bucket.get("camera_detection_count"), dict) else {}
+        for cid, v in cdet.items():
+            camera_detection_count[str(cid)] += int(v)
+
+        calert = bucket.get("camera_alert_count") if isinstance(bucket.get("camera_alert_count"), dict) else {}
+        for cid, v in calert.items():
+            camera_alert_count[str(cid)] += int(v)
 
     detection_over_time = []
     alerts_per_day = []

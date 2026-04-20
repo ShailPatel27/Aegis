@@ -3,14 +3,7 @@ import { Camera, Circle, Grid3x3, Monitor, ChevronLeft, ChevronRight, Maximize2,
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { useCameras } from "../context/CameraContext";
 import { useLocation } from "react-router";
-import { cameraAPI, tokenManager } from "../services/api";
-
-const mockEvents = [
-  { id: 1, type: "Person", confidence: "98%", time: "14:32:45", img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&q=80" },
-  { id: 2, type: "Person", confidence: "95%", time: "14:32:43", img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80" },
-  { id: 3, type: "Vehicle", confidence: "92%", time: "14:31:22", img: "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=100&q=80" },
-  { id: 4, type: "Person", confidence: "89%", time: "14:30:15", img: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=100&q=80" },
-];
+import { cameraAPI, monitorAPI, tokenManager } from "../services/api";
 
 type LayoutType = "single" | "main-with-grid" | "grid";
 
@@ -371,6 +364,7 @@ export function LiveMonitoring() {
   const [screenshot, setScreenshot] = useState(false);
   const [layout, setLayout] = useState<LayoutType>("main-with-grid");
   const [mainCameraIndex, setMainCameraIndex] = useState(0);
+  const [events, setEvents] = useState<Array<{ id: string; type: string; confidence: string; time: string; img: string }>>([]);
 
   // Fix initial selectedCamera when cameras load
   useEffect(() => {
@@ -379,6 +373,40 @@ export function LiveMonitoring() {
       setMainCameraIndex(0);
     }
   }, [cameras]);
+
+  useEffect(() => {
+    let mounted = true;
+    let timer: number | undefined;
+
+    const pollEvents = async () => {
+      const token = tokenManager.getToken();
+      if (!token) return;
+      try {
+        const res = await monitorAPI.getAlerts(token, { limit: 20 });
+        const rows = Array.isArray(res?.alerts) ? res.alerts : [];
+        const mapped = rows.slice(0, 10).map((row: any) => ({
+          id: row.id,
+          type: row.type,
+          confidence: row.confidence == null ? "N/A" : `${Math.round(Number(row.confidence) * 100)}%`,
+          time: new Date(row.timestamp).toLocaleTimeString(),
+          img: row.image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?w=100&q=80",
+        }));
+        if (mounted) {
+          setEvents(mapped);
+        }
+      } catch {
+        // Keep existing events list on transient failures.
+      } finally {
+        timer = window.setTimeout(pollEvents, 5000);
+      }
+    };
+
+    pollEvents();
+    return () => {
+      mounted = false;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, []);
 
   const goToPrevCamera = () => {
     setMainCameraIndex((prev) => (prev === 0 ? cameras.length - 1 : prev - 1));
@@ -685,7 +713,7 @@ export function LiveMonitoring() {
                 Real-Time Events
               </h2>
               <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                {mockEvents.map((event) => (
+                {events.map((event) => (
                   <div key={event.id} className={`p-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
                     }`}>
                     <div className="flex gap-3">
@@ -702,6 +730,11 @@ export function LiveMonitoring() {
                     </div>
                   </div>
                 ))}
+                {events.length === 0 && (
+                  <div className={`p-3 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
+                    No events yet.
+                  </div>
+                )}
               </div>
             </div>
           </div>

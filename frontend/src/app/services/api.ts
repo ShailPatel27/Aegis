@@ -4,6 +4,7 @@ export const BACKEND_BASE_URL =
 
 const API_BASE_URL = `${BACKEND_BASE_URL}/api/v1`;
 const CAMERA_API_URL = `${BACKEND_BASE_URL}/api/cameras`;
+const MONITOR_API_URL = `${API_BASE_URL}/monitor`;
 
 const apiFetch = (url: string, options: RequestInit = {}) => {
   return fetch(url, options);
@@ -363,6 +364,142 @@ export const cameraAPI = {
 
     return response.json();
   }
+};
+
+export const monitorAPI = {
+  getAlerts: async (
+    token: string,
+    params: {
+      alert_type?: string;
+      status?: string;
+      camera_id?: string;
+      date?: string;
+      limit?: number;
+    } = {}
+  ) => {
+    const qs = new URLSearchParams();
+    if (params.alert_type) qs.set("alert_type", params.alert_type);
+    if (params.status) qs.set("status", params.status);
+    if (params.camera_id) qs.set("camera_id", params.camera_id);
+    if (params.date) qs.set("date", params.date);
+    if (typeof params.limit === "number") qs.set("limit", String(params.limit));
+
+    const response = await apiFetch(`${MONITOR_API_URL}/alerts?${qs.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 401) throw new Error("Unauthorized");
+    if (!response.ok) throw new Error("Failed to fetch alerts");
+    return response.json();
+  },
+
+  updateAlertStatus: async (token: string, alertId: string, status: "active" | "resolved" | "dismissed") => {
+    const response = await apiFetch(`${MONITOR_API_URL}/alerts/${alertId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ status }),
+    });
+
+    if (response.status === 401) throw new Error("Unauthorized");
+    if (!response.ok) throw new Error("Failed to update alert status");
+    return response.json();
+  },
+
+  getFaces: async (token: string, limit: number = 200) => {
+    const response = await apiFetch(`${MONITOR_API_URL}/faces?limit=${encodeURIComponent(limit)}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 401) throw new Error("Unauthorized");
+    if (!response.ok) throw new Error("Failed to fetch faces");
+    return response.json();
+  },
+
+  createFace: async (
+    token: string,
+    payload: {
+      name: string;
+      role?: string;
+      image_url?: string;
+      embedding?: number[];
+      apply_to_all?: boolean;
+      camera_ids?: string[];
+    }
+  ) => {
+    const response = await apiFetch(`${MONITOR_API_URL}/faces`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.status === 401) throw new Error("Unauthorized");
+    if (!response.ok) {
+      let message = "Failed to create face";
+      try {
+        const error = await response.json();
+        message = error?.detail || message;
+      } catch {
+        // Keep fallback message.
+      }
+      throw new Error(message);
+    }
+    return response.json();
+  },
+
+  deleteFace: async (token: string, faceId: string) => {
+    const response = await apiFetch(`${MONITOR_API_URL}/faces/${encodeURIComponent(faceId)}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (response.status === 401) throw new Error("Unauthorized");
+    if (!response.ok) {
+      let message = "Failed to delete face";
+      try {
+        const error = await response.json();
+        message = error?.detail || message;
+      } catch {
+        // fallback
+      }
+      throw new Error(message);
+    }
+    return response.json();
+  },
+
+  getDashboard: async (token: string) => {
+    const response = await apiFetch(`${MONITOR_API_URL}/dashboard`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 401) throw new Error("Unauthorized");
+    if (!response.ok) throw new Error("Failed to fetch dashboard");
+    return response.json();
+  },
+
+  getAnalytics: async (token: string, days: number = 7) => {
+    const response = await apiFetch(`${MONITOR_API_URL}/analytics?days=${encodeURIComponent(days)}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 401) throw new Error("Unauthorized");
+    if (!response.ok) throw new Error("Failed to fetch analytics");
+    return response.json();
+  },
 };
 
 // Token management
