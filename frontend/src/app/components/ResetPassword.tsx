@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Check, X, Eye, EyeOff, Key, Mail } from "lucide-react";
+import { BACKEND_BASE_URL } from "../services/api";
 
 export function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -93,7 +94,7 @@ export function ResetPassword() {
     setSuccessMessage("");
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/auth/reset-password', {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/v1/auth/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

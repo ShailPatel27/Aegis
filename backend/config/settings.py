@@ -27,7 +27,7 @@ class Settings:
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
-    API_URL: str = os.getenv("API_URL", "http://localhost:8000")
+    API_URL: str = os.getenv("API_URL", "https://api.lenex.dev")
 
     APP_NAME: str = os.getenv("APP_NAME", "AEGIS Vision System")
     VERSION: str = os.getenv("VERSION", "1.0.0")
@@ -63,6 +63,8 @@ class Settings:
             "http://127.0.0.1:5174",
             "http://localhost:8000",
             "http://127.0.0.1:8000",
+            "https://api.aegis.lenex.dev",
+            "https://aegis.lenex.dev"
         ],
     )
 
@@ -100,7 +102,7 @@ class Settings:
     USER_EMAIL: Optional[str] = os.getenv("USER_EMAIL")
     USER_PASS: Optional[str] = os.getenv("USER_PASS")
 
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://aegis.lenex.dev")
 
     # =========================
     # File Upload Configuration

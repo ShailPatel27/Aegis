@@ -5,6 +5,7 @@ import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { CountryCodeSelector } from "./CountryCodeSelector";
 import { Eye, EyeOff, Mail, Lock, User, Phone } from "lucide-react";
 import { Camera, Monitor, AlertCircle } from "lucide-react";
+import { BACKEND_BASE_URL } from "../services/api";
 
 export function LoginSignup() {
   const navigate = useNavigate();
@@ -99,7 +100,7 @@ export function LoginSignup() {
 
     try {
       const endpoint = usePhoneForReset ? "/auth/forgot-password-alternate" : "/auth/forgot-password";
-      const response = await fetch(`http://localhost:8000/api/v1${endpoint}`, {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/v1${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

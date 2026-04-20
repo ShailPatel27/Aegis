@@ -3,7 +3,7 @@ import { useUser } from "../context/UserContext";
 import { useSharedDarkMode } from "../hooks/useSharedDarkMode";
 import { CountryCodeSelector } from "./CountryCodeSelector";
 import { ProfilePicture } from "./ProfilePicture";
-import { authAPI } from "../services/api";
+import { authAPI, BACKEND_BASE_URL } from "../services/api";
 import {
   Camera,
   Check,
@@ -273,7 +273,7 @@ export function UserProfile({ show, onClose }: UserProfileProps) {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://localhost:8000/api/v1/auth/profile', {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/v1/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -1,6 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AEGIS Auth Test</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
@@ -45,6 +47,7 @@
     </div>
 
     <script>
+        import { BACKEND_BASE_URL } from './src/app/services/api.ts'
         let currentToken = null;
 
         async function login() {
@@ -53,7 +56,7 @@
             const resultDiv = document.getElementById('loginResult');
             
             try {
-                const response = await fetch('http://localhost:8000/auth/login', {
+                const response = await fetch(`${BACKEND_BASE_URL}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
@@ -96,7 +99,7 @@
             }
             
             try {
-                const response = await fetch('http://localhost:8000/auth/recovery-email', {
+                const response = await fetch(`${BACKEND_BASE_URL}/auth/recovery-email`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -128,7 +131,7 @@
             }
             
             try {
-                const response = await fetch('http://localhost:8000/auth/recovery-email', {
+                const response = await fetch(`${BACKEND_BASE_URL}/auth/recovery-email`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -159,7 +162,7 @@
             }
             
             try {
-                const response = await fetch('http://localhost:8000/auth/recovery-email', {
+                const response = await fetch(`${BACKEND_BASE_URL}/auth/recovery-email`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -188,7 +191,7 @@
             localStorage.removeItem('aegis_token');
             
             try {
-                const response = await fetch('http://localhost:8000/auth/recovery-email', {
+                const response = await fetch(`${BACKEND_BASE_URL}/auth/recovery-email`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

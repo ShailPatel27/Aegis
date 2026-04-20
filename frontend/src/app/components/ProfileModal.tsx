@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useUser } from "../context/UserContext";
 import { ProfilePicture } from "./ProfilePicture";
 import { Check, X, Eye, EyeOff, Save, User, Mail, Phone, Shield, Key } from "lucide-react";
+import { BACKEND_BASE_URL } from "../services/api";
 
 interface ProfileModalProps {
   show: boolean;
@@ -142,7 +143,7 @@ export function ProfileModal({ show, onClose }: ProfileModalProps) {
         return;
       }
 
-      const response = await fetch('http://localhost:8000/api/v1/auth/profile', {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/v1/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -163,7 +164,6 @@ export function ProfileModal({ show, onClose }: ProfileModalProps) {
           id: data.user.id,
           email: data.user.email,
           name: data.user.name,
-          type: data.user.user_type,
           cameraId: data.user.camera_id,
           phone: data.user.phone,
           recovery_email: data.user.recovery_email,
@@ -265,19 +265,6 @@ export function ProfileModal({ show, onClose }: ProfileModalProps) {
               />
               {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
             </div>
-
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                <Shield className="w-4 h-4" />
-                User Type
-              </label>
-              <input
-                type="text"
-                value={user?.type || "monitor"}
-                readOnly
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
-              />
-            </div>
           </div>
 
           {/* Contact Information */}
@@ -355,7 +342,7 @@ export function ProfileModal({ show, onClose }: ProfileModalProps) {
           </div>
 
           {/* Camera ID (for camera users) */}
-          {user?.type === "camera" && user?.cameraId && (
+          {user?.cameraId && (
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                 <Shield className="w-4 h-4" />
