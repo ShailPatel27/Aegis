@@ -11,6 +11,7 @@ import uvicorn
 
 from auth.routes import router as auth_router
 from camera.routes import router as camera_router
+from monitor.routes import router as monitor_router
 from config.settings import settings
 
 
@@ -65,6 +66,7 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(camera_router, prefix="/api/cameras")
+app.include_router(monitor_router, prefix="/api/v1/monitor")
 
 
 @app.get("/health")
