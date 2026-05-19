@@ -75,7 +75,7 @@ export function Dashboard() {
     <div className="p-8">
       <div className="mb-8">
         <h1 className={`text-3xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>Dashboard</h1>
-        <p className={`mt-1 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>Real-time overview of your vision system</p>
+        <p className={`mt-1 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>Real-time overview the system</p>
       </div>
 
       {loading ? (
